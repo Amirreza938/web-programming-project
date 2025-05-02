@@ -1,9 +1,6 @@
-# DejaNew
-Every item feels “already seen… but brand‑new to you.”
-**DejaNew**: where pre‑loved treasures spark that “brand‑new” déjà vu.
-
-
 # DejaNew Project - Features and Requirements
+
+Every item feels “already seen… but brand‑new to you.
 
 ## Table of Contents
 
@@ -21,11 +18,6 @@ Every item feels “already seen… but brand‑new to you.”
    * [Settings](#settings-تنظیمات)
 3. [Chat Page](#chat-page)
    * [chat flow](#Chat-Flow)
-4. [Posting Advertisements](#posting-advertisements)
-5. [Advertisement Management](#advertisement-management)
-6. [Browsing and Searching](#browsing-and-searching)
-7. [Categories and Subcategories](#categories-and-subcategories)
-8. [Messaging System](#messaging-system)
 
 ## Overview
 
