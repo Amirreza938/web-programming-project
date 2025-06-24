@@ -135,3 +135,134 @@ This project aims to implement a comprehensive online platform modeled after the
 3. Chooses between "تماس ناشناس" or "چت دیوار"
 4. Manages chats using filtering options
 5. Adjusts settings and response hours as needed
+
+
+---
+
+
+## DejaNew API Endpoints
+
+This section provides an overview of all the API endpoints used to support the DejaNew second-hand store platform (a Divar-like clone). These endpoints are grouped based on their functionality and mapped to user-visible features.
+
+---
+
+### Authentication & Identity Verification
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST   | `/api/auth/register/` | User registration |
+| POST   | `/api/auth/login/` | Login and return access token |
+| POST   | `/api/auth/logout/` | Logout and invalidate token |
+| POST   | `/api/auth/verify-phone/` | Verify mobile number via SMS |
+| POST   | `/api/auth/request-reset/` | Request password reset |
+| POST   | `/api/auth/reset-password/` | Confirm password reset |
+| GET    | `/api/auth/sessions/` | List all active sessions |
+| DELETE | `/api/auth/sessions/<id>/` | Terminate a session |
+| POST   | `/api/auth/verify-identity/` | Submit identity verification info |
+
+---
+
+### Profile Management
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET    | `/api/profile/` | View user profile |
+| PUT    | `/api/profile/` | Update profile info |
+| GET    | `/api/profile/public/<user_id>/` | View public profile (optional) |
+
+---
+
+### Advertisements
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET    | `/api/ads/` | List all ads (with filters) |
+| POST   | `/api/ads/` | Create a new ad |
+| GET    | `/api/ads/<id>/` | View ad details |
+| PUT    | `/api/ads/<id>/` | Update an ad |
+| DELETE | `/api/ads/<id>/` | Delete an ad |
+| GET    | `/api/ads/my/` | List my ads (active, draft, inactive) |
+| POST   | `/api/ads/<id>/publish/` | Publish an incomplete ad |
+| POST   | `/api/ads/<id>/deactivate/` | Deactivate an ad |
+
+---
+
+### Bookmarks
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET    | `/api/bookmarks/` | List bookmarked ads |
+| POST   | `/api/bookmarks/` | Add a new bookmark |
+| DELETE | `/api/bookmarks/<ad_id>/` | Remove a bookmark |
+
+---
+
+### Notes
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET    | `/api/notes/` | List notes on ads |
+| POST   | `/api/notes/` | Add a note |
+| PUT    | `/api/notes/<id>/` | Edit a note |
+| DELETE | `/api/notes/<id>/` | Delete a note |
+
+---
+
+### Recent Activities
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET    | `/api/activities/recent/` | List recently viewed ads |
+| DELETE | `/api/activities/clear/` | Clear all recent activities |
+
+---
+
+### Professional Features
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST   | `/api/professional/upgrade/` | Request professional upgrade |
+| GET    | `/api/professional/status/` | Check professional account status |
+
+---
+
+### Security & Privacy
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST   | `/api/security/report/` | Report scam or abuse |
+| POST   | `/api/security/block-user/` | Block another user |
+| GET    | `/api/security/blocked-users/` | List blocked users |
+
+---
+
+### Settings
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET/PUT | `/api/settings/account/` | Change password, enable 2FA |
+| GET/PUT | `/api/settings/notifications/` | Notification preferences |
+| GET/PUT | `/api/settings/privacy/` | Privacy and visibility |
+| GET/PUT | `/api/settings/theme/` | Toggle dark/light mode |
+| GET/PUT | `/api/settings/city/` | Set preferred city |
+| POST    | `/api/settings/history/clear/` | Clear visit/search/bookmark history |
+| GET/PUT | `/api/settings/chat/` | Chat-specific settings |
+
+---
+
+### Chat System
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET    | `/api/chat/conversations/` | List all conversations |
+| GET    | `/api/chat/conversations/<id>/` | Get messages in a conversation |
+| POST   | `/api/chat/send-message/` | Send a message |
+| POST   | `/api/chat/set-display-name/` | Set or update chat display name |
+| GET/PUT| `/api/chat/settings/` | Update chat availability, filters |
+| GET    | `/api/chat/suspicious/` | List suspected spam chats |
+| GET    | `/api/chat/unread/` | List unread chats |
+| GET    | `/api/chat/my-ads/` | Filter chat by user’s ads |
+| GET    | `/api/chat/others-ads/` | Filter chat by other ads |
+| DELETE | `/api/chat/<id>/` | Delete chat (optional, soft-delete) |
+
+
