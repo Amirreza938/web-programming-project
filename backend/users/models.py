@@ -1,0 +1,109 @@
+from django.contrib.auth.models import AbstractUser
+from django.db import models
+from django.core.validators import MinValueValidator, MaxValueValidator
+
+
+class User(AbstractUser):
+    USER_TYPE_CHOICES = [
+        ('buyer', 'Buyer'),
+        ('seller', 'Seller'),
+        ('both', 'Both'),
+    ]
+    
+    VERIFICATION_STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('verified', 'Verified'),
+        ('rejected', 'Rejected'),
+    ]
+    
+    # Basic profile fields
+    user_type = models.CharField(max_length=10, choices=USER_TYPE_CHOICES, default='buyer')
+    phone_number = models.CharField(max_length=15, blank=True, null=True)
+    address = models.TextField(blank=True, null=True)
+    city = models.CharField(max_length=100, blank=True, null=True)
+    country = models.CharField(max_length=100, blank=True, null=True)
+    postal_code = models.CharField(max_length=20, blank=True, null=True)
+    
+    # Seller verification
+    verification_status = models.CharField(
+        max_length=10, 
+        choices=VERIFICATION_STATUS_CHOICES, 
+        default='pending'
+    )
+    verification_documents = models.FileField(upload_to='verification_docs/', blank=True, null=True)
+    verification_date = models.DateTimeField(blank=True, null=True)
+    
+    # Profile image
+    profile_image = models.ImageField(upload_to='profile_images/', blank=True, null=True)
+    
+    # Rating and reputation
+    average_rating = models.DecimalField(
+        max_digits=3, 
+        decimal_places=2, 
+        default=0.00,
+        validators=[MinValueValidator(0), MaxValueValidator(5)]
+    )
+    total_ratings = models.PositiveIntegerField(default=0)
+    
+    # Account status
+    is_active_seller = models.BooleanField(default=False)
+    is_premium = models.BooleanField(default=False)
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'users'
+        verbose_name = 'User'
+        verbose_name_plural = 'Users'
+    
+    def __str__(self):
+        return f"{self.username} ({self.get_user_type_display()})"
+    
+    def get_full_name(self):
+        return f"{self.first_name} {self.last_name}".strip() or self.username
+    
+    def is_verified_seller(self):
+        return self.verification_status == 'verified' and self.is_active_seller
+    
+    def update_average_rating(self, new_rating):
+        """Update average rating when a new rating is added"""
+        total_rating = self.average_rating * self.total_ratings + new_rating
+        self.total_ratings += 1
+        self.average_rating = total_rating / self.total_ratings
+        self.save()
+
+
+class UserRating(models.Model):
+    """Model for user ratings and reviews"""
+    from_user = models.ForeignKey(
+        User, 
+        on_delete=models.CASCADE, 
+        related_name='ratings_given'
+    )
+    to_user = models.ForeignKey(
+        User, 
+        on_delete=models.CASCADE, 
+        related_name='ratings_received'
+    )
+    rating = models.PositiveIntegerField(
+        validators=[MinValueValidator(1), MaxValueValidator(5)]
+    )
+    review = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        unique_together = ('from_user', 'to_user')
+        db_table = 'user_ratings'
+    
+    def __str__(self):
+        return f"{self.from_user.username} rated {self.to_user.username}: {self.rating}/5"
+    
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+        
+        if is_new:
+            # Update the recipient's average rating
+            self.to_user.update_average_rating(self.rating)
