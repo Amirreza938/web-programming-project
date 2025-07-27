@@ -2,62 +2,77 @@ import React, { useState, useEffect } from 'react';
 import {
   Box,
   Container,
-  Grid,
-  Card,
-  CardContent,
-  CardMedia,
-  Typography,
-  Chip,
+  Heading,
+  Text,
   Button,
-  TextField,
-  FormControl,
-  InputLabel,
+  Input,
+  InputGroup,
+  InputLeftElement,
   Select,
-  MenuItem,
   Slider,
-  Pagination,
-  Paper,
-  InputAdornment,
+  SliderTrack,
+  SliderFilledTrack,
+  SliderThumb,
+  Card,
+  CardBody,
+  Image,
+  Badge,
+  Flex,
+  VStack,
+  HStack,
   IconButton,
+  useDisclosure,
   Drawer,
-  useTheme,
-  useMediaQuery,
-  Stack,
+  DrawerBody,
+  DrawerHeader,
+  DrawerOverlay,
+  DrawerContent,
+  DrawerCloseButton,
+  SimpleGrid,
+  useToast,
+  Spinner,
+  Center,
   Divider,
-} from '@mui/material';
+  useColorModeValue,
+  RangeSlider,
+  RangeSliderTrack,
+  RangeSliderFilledTrack,
+  RangeSliderThumb,
+} from '@chakra-ui/react';
 import {
-  Search,
-  FilterList,
-  Favorite,
-  FavoriteBorder,
-  LocationOn,
-  Visibility,
-  Sort,
-} from '@mui/icons-material';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+  SearchIcon,
+  CloseIcon,
+  StarIcon,
+  ViewIcon,
+} from '@chakra-ui/icons';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { apiService } from '../services/api';
 import LoadingSpinner from '../components/common/LoadingSpinner';
-import { useAuth } from '../contexts/AuthContext';
 
 const ProductListPage: React.FC = () => {
-  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const { user } = useAuth();
-  const theme = useTheme();
-  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const toast = useToast();
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  
+  const bg = useColorModeValue('white', 'gray.800');
+  const cardBg = useColorModeValue('white', 'gray.700');
 
-  // Filter states
-  const [searchQuery, setSearchQuery] = useState(searchParams.get('search') || '');
-  const [category, setCategory] = useState(searchParams.get('category') || '');
-  const [condition, setCondition] = useState(searchParams.get('condition') || '');
-  const [priceRange, setPriceRange] = useState<number[]>([
-    parseInt(searchParams.get('min_price') || '0'),
-    parseInt(searchParams.get('max_price') || '10000'),
-  ]);
-  const [sortBy, setSortBy] = useState(searchParams.get('sort') || 'newest');
-  const [page, setPage] = useState(parseInt(searchParams.get('page') || '1'));
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  // URL Parameters
+  const search = searchParams.get('search') || '';
+  const category = searchParams.get('category') || '';
+  const condition = searchParams.get('condition') || '';
+  const minPrice = searchParams.get('minPrice') || '0';
+  const maxPrice = searchParams.get('maxPrice') || '10000';
+  const sortBy = searchParams.get('sortBy') || 'newest';
+  const page = parseInt(searchParams.get('page') || '1');
+
+  // Local State
+  const [localSearch, setLocalSearch] = useState(search);
+  const [localCategory, setLocalCategory] = useState(category);
+  const [localCondition, setLocalCondition] = useState(condition);
+  const [localPriceRange, setLocalPriceRange] = useState([parseInt(minPrice), parseInt(maxPrice)]);
+  const [localSortBy, setLocalSortBy] = useState(sortBy);
 
   // Fetch categories
   const { data: categories } = useQuery({
@@ -65,74 +80,32 @@ const ProductListPage: React.FC = () => {
     queryFn: () => apiService.getCategories(),
   });
 
+  // Ensure categories is always an array
+  const categoriesArray = Array.isArray(categories) ? categories : [];
+
   // Fetch products with filters
-  const { data: productsData, isLoading } = useQuery({
-    queryKey: ['products', searchQuery, category, condition, priceRange, sortBy, page],
+  const { data: productsData, isLoading, error } = useQuery({
+    queryKey: ['products', search, category, condition, minPrice, maxPrice, sortBy, page],
     queryFn: () => apiService.getProducts({
-      search: searchQuery,
-      category: category || undefined,
-      condition: condition || undefined,
-      min_price: priceRange[0],
-      max_price: priceRange[1],
-      ordering: sortBy,
+      search,
+      category,
+      condition,
+      min_price: minPrice,
+      max_price: maxPrice,
+      sort_by: sortBy,
       page,
     }),
-    keepPreviousData: true,
+    placeholderData: (previousData) => previousData,
   });
 
-  // Update URL params when filters change
-  useEffect(() => {
-    const params = new URLSearchParams();
-    if (searchQuery) params.set('search', searchQuery);
-    if (category) params.set('category', category);
-    if (condition) params.set('condition', condition);
-    if (priceRange[0] > 0) params.set('min_price', priceRange[0].toString());
-    if (priceRange[1] < 10000) params.set('max_price', priceRange[1].toString());
-    if (sortBy !== 'newest') params.set('sort', sortBy);
-    if (page > 1) params.set('page', page.toString());
-    
-    setSearchParams(params);
-  }, [searchQuery, category, condition, priceRange, sortBy, page, setSearchParams]);
-
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    setPage(1);
-  };
-
-  const handleFilterChange = () => {
-    setPage(1);
-  };
-
-  const handlePriceRangeChange = (event: Event, newValue: number | number[]) => {
-    setPriceRange(newValue as number[]);
-  };
-
-  const handlePriceRangeChangeCommitted = () => {
-    handleFilterChange();
-  };
-
-  const handleFavoriteToggle = async (productId: number, isFavorited: boolean) => {
-    try {
-      if (isFavorited) {
-        await apiService.removeFromFavorites(productId);
-      } else {
-        await apiService.addToFavorites(productId);
-      }
-      // Refetch products to update favorite status
-      window.location.reload();
-    } catch (error) {
-      console.error('Error toggling favorite:', error);
-    }
-  };
-
-  const clearFilters = () => {
-    setSearchQuery('');
-    setCategory('');
-    setCondition('');
-    setPriceRange([0, 10000]);
-    setSortBy('newest');
-    setPage(1);
-  };
+  const sortOptions = [
+    { value: 'newest', label: 'Newest First' },
+    { value: 'oldest', label: 'Oldest First' },
+    { value: 'price_low', label: 'Price: Low to High' },
+    { value: 'price_high', label: 'Price: High to Low' },
+    { value: 'popular', label: 'Most Popular' },
+    { value: 'views', label: 'Most Viewed' },
+  ];
 
   const conditionOptions = [
     { value: 'new', label: 'New' },
@@ -143,403 +116,413 @@ const ProductListPage: React.FC = () => {
     { value: 'needs_repair', label: 'Needs Repair' },
   ];
 
-  const sortOptions = [
-    { value: 'newest', label: 'Newest First' },
-    { value: 'oldest', label: 'Oldest First' },
-    { value: 'price_low', label: 'Price: Low to High' },
-    { value: 'price_high', label: 'Price: High to Low' },
-    { value: 'most_viewed', label: 'Most Viewed' },
-  ];
+  // Update URL when filters change
+  useEffect(() => {
+    const params = new URLSearchParams();
+    if (search) params.set('search', search);
+    if (category) params.set('category', category);
+    if (condition) params.set('condition', condition);
+    if (minPrice !== '0') params.set('minPrice', minPrice);
+    if (maxPrice !== '10000') params.set('maxPrice', maxPrice);
+    if (sortBy !== 'newest') params.set('sortBy', sortBy);
+    if (page > 1) params.set('page', page.toString());
+    
+    setSearchParams(params);
+  }, [search, category, condition, minPrice, maxPrice, sortBy, page, setSearchParams]);
 
-  const FilterDrawer = () => (
-    <Drawer
-      anchor="left"
-      open={drawerOpen}
-      onClose={() => setDrawerOpen(false)}
-      sx={{
-        '& .MuiDrawer-paper': {
-          width: 300,
-          p: 3,
-        },
-      }}
-    >
-      <Typography variant="h6" gutterBottom>
-        Filters
-      </Typography>
-      <FilterContent />
-    </Drawer>
-  );
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (localSearch.trim()) {
+      setSearchParams(prev => {
+        const newParams = new URLSearchParams(prev);
+        newParams.set('search', localSearch.trim());
+        newParams.delete('page'); // Reset to first page
+        return newParams;
+      });
+    }
+  };
 
-  const FilterContent = () => (
-    <Stack spacing={3}>
-      {/* Category Filter */}
-      <FormControl fullWidth>
-        <InputLabel>Category</InputLabel>
-        <Select
-          value={category}
-          label="Category"
-          onChange={(e) => {
-            setCategory(e.target.value);
-            handleFilterChange();
-          }}
-        >
-          <MenuItem value="">All Categories</MenuItem>
-          {categories?.map((cat) => (
-            <MenuItem key={cat.id} value={cat.id}>
-              {cat.name}
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
+  const handleClearFilters = () => {
+    setLocalSearch('');
+    setLocalCategory('');
+    setLocalCondition('');
+    setLocalPriceRange([0, 10000]);
+    setLocalSortBy('newest');
+    setSearchParams({});
+  };
 
-      {/* Condition Filter */}
-      <FormControl fullWidth>
-        <InputLabel>Condition</InputLabel>
-        <Select
-          value={condition}
-          label="Condition"
-          onChange={(e) => {
-            setCondition(e.target.value);
-            handleFilterChange();
-          }}
-        >
-          <MenuItem value="">All Conditions</MenuItem>
-          {conditionOptions.map((option) => (
-            <MenuItem key={option.value} value={option.value}>
-              {option.label}
-            </MenuItem>
-          ))}
-        </Select>
-      </FormControl>
+  const handlePriceChange = (values: number[]) => {
+    setLocalPriceRange(values);
+  };
 
-      {/* Price Range Filter */}
-      <Box>
-        <Typography gutterBottom>Price Range</Typography>
-        <Slider
-          value={priceRange}
-          onChange={handlePriceRangeChange}
-          onChangeCommitted={handlePriceRangeChangeCommitted}
-          valueLabelDisplay="auto"
-          min={0}
-          max={10000}
-          step={100}
-        />
-        <Box sx={{ display: 'flex', gap: 1, mt: 1 }}>
-          <TextField
-            size="small"
-            label="Min"
-            type="number"
-            value={priceRange[0]}
-            onChange={(e) => {
-              const value = parseInt(e.target.value) || 0;
-              setPriceRange([value, priceRange[1]]);
-            }}
-            onBlur={handleFilterChange}
-          />
-          <TextField
-            size="small"
-            label="Max"
-            type="number"
-            value={priceRange[1]}
-            onChange={(e) => {
-              const value = parseInt(e.target.value) || 10000;
-              setPriceRange([priceRange[0], value]);
-            }}
-            onBlur={handleFilterChange}
-          />
-        </Box>
-      </Box>
+  const applyFilters = () => {
+    setSearchParams(prev => {
+      const newParams = new URLSearchParams(prev);
+      if (localSearch) newParams.set('search', localSearch);
+      if (localCategory) newParams.set('category', localCategory);
+      if (localCondition) newParams.set('condition', localCondition);
+      newParams.set('minPrice', localPriceRange[0].toString());
+      newParams.set('maxPrice', localPriceRange[1].toString());
+      newParams.set('sortBy', localSortBy);
+      newParams.delete('page'); // Reset to first page
+      return newParams;
+    });
+    onClose(); // Close mobile drawer
+  };
 
-      <Button variant="outlined" onClick={clearFilters}>
-        Clear Filters
-      </Button>
-    </Stack>
-  );
+  const handlePageChange = (newPage: number) => {
+    setSearchParams(prev => {
+      const newParams = new URLSearchParams(prev);
+      newParams.set('page', newPage.toString());
+      return newParams;
+    });
+  };
 
   if (isLoading) {
     return <LoadingSpinner />;
   }
 
+  if (error) {
+    toast({
+      title: 'Error loading products',
+      description: 'Please try again later.',
+      status: 'error',
+      duration: 5000,
+      isClosable: true,
+    });
+  }
+
   return (
-    <Container maxWidth="lg">
-      <Box sx={{ py: 3 }}>
+    <Box minH="100vh" bg="gray.50">
+      <Container maxW="1200px" py={8}>
         {/* Header */}
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="h4" gutterBottom>
+        <VStack spacing={6} align="stretch">
+          <Heading as="h1" size="xl">
             Browse Products
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
+          </Heading>
+          <Text color="gray.600">      
             {productsData?.count || 0} products found
-          </Typography>
-        </Box>
+          </Text>
+        </VStack>
 
-        {/* Search and Sort Bar */}
-        <Paper sx={{ p: 2, mb: 3 }}>
-          <Grid container spacing={2} alignItems="center">
-            {/* Search */}
-            <Grid item xs={12} md={6}>
-              <Box component="form" onSubmit={handleSearch}>
-                <TextField
-                  fullWidth
-                  placeholder="Search products..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  InputProps={{
-                    startAdornment: (
-                      <InputAdornment position="start">
-                        <Search />
-                      </InputAdornment>
-                    ),
-                  }}
-                />
+        {/* Search and Filter Bar */}
+        <Card mb={6} shadow="sm">
+          <CardBody p={6}>
+            <SimpleGrid columns={{ base: 1, md: 3 }} gap={4} alignItems="center">
+              {/* Search */}
+              <Box>
+                <form onSubmit={handleSearch}>       
+                  <InputGroup>
+                    <InputLeftElement>
+                      <SearchIcon color="gray.400" />
+                    </InputLeftElement>
+                    <Input
+                      placeholder="Search products..."
+                      value={localSearch}
+                      onChange={(e) => setLocalSearch(e.target.value)}
+                    />
+                  </InputGroup>
+                </form>
               </Box>
-            </Grid>
 
-            {/* Sort */}
-            <Grid item xs={12} md={3}>
-              <FormControl fullWidth>
-                <InputLabel>Sort By</InputLabel>
-                <Select
-                  value={sortBy}
-                  label="Sort By"
-                  onChange={(e) => {
-                    setSortBy(e.target.value);
-                    handleFilterChange();
-                  }}
-                >
-                  {sortOptions.map((option) => (
-                    <MenuItem key={option.value} value={option.value}>
-                      {option.label}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
+              {/* Sort */}
+              <Select
+                value={localSortBy}
+                onChange={(e) => setLocalSortBy(e.target.value)}
+              >
+                {sortOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </Select>
 
-            {/* Filter Button */}
-            <Grid item xs={12} md={3}>
+              {/* Filter Button */}
               <Button
-                variant="outlined"
-                startIcon={<FilterList />}
-                onClick={() => setDrawerOpen(true)}
-                fullWidth
+                variant="outline"
+                onClick={onOpen}
+                display={{ base: 'flex', md: 'none' }}
               >
                 Filters
               </Button>
-            </Grid>
-          </Grid>
-        </Paper>
+            </SimpleGrid>
+          </CardBody>
+        </Card>
 
-        {/* Desktop Filters */}
-        {!isMobile && (
-          <Grid container spacing={3}>
-            <Grid item md={3}>
-              <Paper sx={{ p: 2, height: 'fit-content' }}>
-                <Typography variant="h6" gutterBottom>
-                  Filters
-                </Typography>
-                <FilterContent />
-              </Paper>
-            </Grid>
+        {/* Desktop Layout */}
+        <SimpleGrid columns={{ base: 1, lg: 4 }} gap={6}>
+          {/* Filters Sidebar */}
+          <Box display={{ base: 'none', lg: 'block' }}>
+            <Card shadow="sm" position="sticky" top={4}>
+              <CardBody p={6}>
+                <VStack spacing={6} align="stretch">
+                  <Heading as="h3" size="md">
+                    Filters
+                  </Heading>
 
-            {/* Products Grid */}
-            <Grid item md={9}>
-              <Grid container spacing={3}>
-                {productsData?.results?.map((product) => (
-                  <Grid item xs={12} sm={6} lg={4} key={product.id}>
-                    <Card
-                      sx={{
-                        height: '100%',
-                        display: 'flex',
-                        flexDirection: 'column',
-                        cursor: 'pointer',
-                        '&:hover': {
-                          transform: 'translateY(-4px)',
-                          transition: 'transform 0.2s',
-                        },
-                      }}
+                  {/* Category Filter */}
+                  <VStack align="stretch" spacing={3}>
+                    <Text fontWeight="semibold">Category</Text>
+                    <Select
+                      value={localCategory}
+                      onChange={(e) => setLocalCategory(e.target.value)}
+                      placeholder="All Categories"
                     >
-                      <Box sx={{ position: 'relative' }}>
-                        <CardMedia
-                          component="img"
-                          height="200"
-                          image={product.main_image || 'https://via.placeholder.com/300x200?text=No+Image'}
-                          alt={product.title}
-                          onClick={() => navigate(`/products/${product.id}`)}
-                        />
-                        {user && (
-                          <IconButton
-                            sx={{
-                              position: 'absolute',
-                              top: 8,
-                              right: 8,
-                              bgcolor: 'rgba(255,255,255,0.8)',
-                            }}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleFavoriteToggle(product.id, product.is_favorited);
-                            }}
-                          >
-                            {product.is_favorited ? (
-                              <Favorite color="error" />
-                            ) : (
-                              <FavoriteBorder />
-                            )}
-                          </IconButton>
-                        )}
-                      </Box>
-                      <CardContent sx={{ flexGrow: 1 }}>
-                        <Typography
-                          variant="h6"
-                          noWrap
-                          onClick={() => navigate(`/products/${product.id}`)}
-                          sx={{ cursor: 'pointer' }}
-                        >
-                          {product.title}
-                        </Typography>
-                        <Typography variant="h6" color="primary" sx={{ fontWeight: 'bold', my: 1 }}>
-                          ${product.price}
-                        </Typography>
-                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                          <LocationOn fontSize="small" color="action" />
-                          <Typography variant="body2" color="text.secondary" sx={{ ml: 0.5 }}>
-                            {product.location}
-                          </Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                          <Visibility fontSize="small" color="action" />
-                          <Typography variant="body2" color="text.secondary" sx={{ ml: 0.5 }}>
-                            {product.views_count} views
-                          </Typography>
-                        </Box>
-                        <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                          <Chip
-                            label={product.condition}
-                            size="small"
-                            color="secondary"
-                            variant="outlined"
-                          />
-                          {product.is_negotiable && (
-                            <Chip
-                              label="Negotiable"
-                              size="small"
-                              color="primary"
-                              variant="outlined"
-                            />
-                          )}
-                        </Box>
-                      </CardContent>
-                    </Card>
-                  </Grid>
-                ))}
-              </Grid>
+                      {categoriesArray.map((cat) => (
+                        <option key={cat.id} value={cat.id}>
+                          {cat.name}
+                        </option>
+                      ))}
+                    </Select>
+                  </VStack>
 
-              {/* Pagination */}
-              {productsData && productsData.count > 0 && (
-                <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-                  <Pagination
-                    count={Math.ceil(productsData.count / 12)}
-                    page={page}
-                    onChange={(e, value) => setPage(value)}
-                    color="primary"
-                  />
-                </Box>
-              )}
-            </Grid>
-          </Grid>
-        )}
+                  {/* Condition Filter */}
+                  <VStack align="stretch" spacing={3}>
+                    <Text fontWeight="semibold">Condition</Text>
+                    <Select
+                      value={localCondition}
+                      onChange={(e) => setLocalCondition(e.target.value)}
+                      placeholder="All Conditions"
+                    >
+                      {conditionOptions.map((option) => (
+                        <option key={option.value} value={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </Select>
+                  </VStack>
 
-        {/* Mobile Layout */}
-        {isMobile && (
-          <>
-            <Grid container spacing={2}>
-              {productsData?.results?.map((product) => (
-                <Grid item xs={12} sm={6} key={product.id}>
-                  <Card
-                    sx={{
-                      height: '100%',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      cursor: 'pointer',
-                    }}
+                  {/* Price Range Filter */}
+                  <VStack align="stretch" spacing={3}>
+                    <Text fontWeight="semibold">Price Range</Text>
+                    <RangeSlider
+                      value={localPriceRange}
+                      onChange={handlePriceChange}
+                      min={0}
+                      max={10000}
+                      step={100}
+                    >
+                      <RangeSliderTrack>
+                        <RangeSliderFilledTrack />
+                      </RangeSliderTrack>
+                      <RangeSliderThumb index={0} />
+                      <RangeSliderThumb index={1} />
+                    </RangeSlider>
+                    <HStack justify="space-between">
+                      <Text fontSize="sm">${localPriceRange[0]}</Text>
+                      <Text fontSize="sm">${localPriceRange[1]}</Text>
+                    </HStack>
+                  </VStack>
+
+                  {/* Apply Filters */}
+                  <Button
+                    colorScheme="brand"
+                    onClick={applyFilters}
+                    w="full"
                   >
-                    <Box sx={{ position: 'relative' }}>
-                      <CardMedia
-                        component="img"
-                        height="150"
-                        image={product.main_image || 'https://via.placeholder.com/300x200?text=No+Image'}
-                        alt={product.title}
-                        onClick={() => navigate(`/products/${product.id}`)}
-                      />
-                      {user && (
-                        <IconButton
-                          sx={{
-                            position: 'absolute',
-                            top: 4,
-                            right: 4,
-                            bgcolor: 'rgba(255,255,255,0.8)',
-                          }}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleFavoriteToggle(product.id, product.is_favorited);
-                          }}
-                        >
-                          {product.is_favorited ? (
-                            <Favorite color="error" />
-                          ) : (
-                            <FavoriteBorder />
-                          )}
-                        </IconButton>
-                      )}
-                    </Box>
-                    <CardContent>
-                      <Typography
-                        variant="h6"
-                        noWrap
-                        onClick={() => navigate(`/products/${product.id}`)}
-                        sx={{ cursor: 'pointer' }}
-                      >
-                        {product.title}
-                      </Typography>
-                      <Typography variant="h6" color="primary" sx={{ fontWeight: 'bold', my: 1 }}>
-                        ${product.price}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" noWrap>
-                        {product.location}
-                      </Typography>
-                      <Box sx={{ mt: 1 }}>
-                        <Chip
-                          label={product.condition}
-                          size="small"
-                          color="secondary"
-                          variant="outlined"
-                        />
-                      </Box>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              ))}
-            </Grid>
+                    Apply Filters
+                  </Button>
 
-            {/* Mobile Pagination */}
-            {productsData && productsData.count > 0 && (
-              <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
-                <Pagination
-                  count={Math.ceil(productsData.count / 12)}
-                  page={page}
-                  onChange={(e, value) => setPage(value)}
-                  color="primary"
-                  size="small"
-                />
-              </Box>
+                  {/* Clear Filters */}
+                  <Button
+                    variant="outline"
+                    leftIcon={<CloseIcon />}
+                    onClick={handleClearFilters}
+                    w="full"
+                  >
+                    Clear Filters
+                  </Button>
+                </VStack>
+              </CardBody>
+            </Card>
+          </Box>
+
+          {/* Products Grid */}
+          <Box gridColumn={{ lg: 'span 3' }}>
+            {isLoading ? (
+              <Center py={12}>
+                <Spinner size="xl" color="brand.500" />
+              </Center>
+            ) : (
+              <VStack spacing={6}>
+                <SimpleGrid columns={{ base: 1, md: 2, xl: 3 }} gap={6}>
+                  {productsData?.results?.map((product: any) => (
+                    <Card
+                      key={product.id}
+                      bg={cardBg}
+                      shadow="md"
+                      _hover={{ shadow: 'lg', transform: 'translateY(-2px)' }}
+                      transition="all 0.2s"
+                      cursor="pointer"
+                      onClick={() => window.location.href = `/products/${product.id}`}
+                    >
+                      <Image
+                        src={product.main_image || 'https://via.placeholder.com/300x200?text=No+Image'}
+                        alt={product.title}
+                        height="200px"
+                        objectFit="cover"
+                      />
+                      <CardBody>
+                        <VStack align="start" spacing={3}>
+                          <Heading as="h3" size="md" noOfLines={2}>
+                            {product.title}
+                          </Heading>
+                          <Text fontSize="xl" fontWeight="bold" color="brand.500">
+                            ${product.price}
+                          </Text>
+                          {product.original_price && product.original_price > product.price && (
+                            <Text fontSize="sm" color="gray.500" textDecoration="line-through">
+                              ${product.original_price}
+                            </Text>
+                          )}
+                          <HStack spacing={2}>
+                            <Badge colorScheme="blue" variant="outline">
+                              {product.condition}
+                            </Badge>
+                            {product.is_negotiable && (
+                              <Badge colorScheme="green" variant="outline">
+                                Negotiable
+                              </Badge>
+                            )}
+                          </HStack>
+                          <HStack spacing={2} color="gray.600">
+                            <ViewIcon />
+                            <Text fontSize="sm">{product.views_count} views</Text>
+                          </HStack>
+                          <Text fontSize="sm" color="gray.600" noOfLines={1}>
+                            {product.location}
+                          </Text>
+                          <HStack justify="space-between" w="full">
+                            <Text fontSize="sm" color="gray.600">
+                              by {product.seller_name}
+                            </Text>
+                            <IconButton
+                              size="sm"
+                              variant="ghost"
+                              aria-label="Add to favorites"
+                              icon={<StarIcon />}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                // Handle favorite toggle
+                              }}
+                            />
+                          </HStack>
+                        </VStack>
+                      </CardBody>
+                    </Card>
+                  ))}
+                </SimpleGrid>
+
+                {/* Pagination */}
+                {productsData?.count && productsData.count > 0 && (
+                  <Flex justify="center" w="full">
+                    <HStack spacing={2}>
+                      {Array.from({ length: Math.ceil((productsData?.count || 0) / 12) }, (_, i) => (
+                        <Button
+                          key={i + 1}
+                          variant={page === i + 1 ? 'solid' : 'outline'}
+                          colorScheme="brand"
+                          onClick={() => handlePageChange(i + 1)}
+                        >
+                          {i + 1}
+                        </Button>
+                      ))}
+                    </HStack>
+                  </Flex>
+                )}
+              </VStack>
             )}
-          </>
-        )}
+          </Box>
+        </SimpleGrid>
 
         {/* Mobile Filter Drawer */}
-        <FilterDrawer />
-      </Box>
-    </Container>
+        <Drawer isOpen={isOpen} placement="right" onClose={onClose} size="full">
+          <DrawerOverlay />
+          <DrawerContent>
+            <DrawerCloseButton />
+            <DrawerHeader>Filters</DrawerHeader>
+            <DrawerBody>
+              <VStack spacing={6} align="stretch">
+                {/* Category Filter */}
+                <VStack align="stretch" spacing={3}>
+                  <Text fontWeight="semibold">Category</Text>
+                  <Select
+                    value={localCategory}
+                    onChange={(e) => setLocalCategory(e.target.value)}
+                    placeholder="All Categories"
+                  >
+                    {categoriesArray.map((cat) => (
+                      <option key={cat.id} value={cat.id}>
+                        {cat.name}
+                      </option>
+                    ))}
+                  </Select>
+                </VStack>
+
+                {/* Condition Filter */}
+                <VStack align="stretch" spacing={3}>
+                  <Text fontWeight="semibold">Condition</Text>
+                  <Select
+                    value={localCondition}
+                    onChange={(e) => setLocalCondition(e.target.value)}
+                    placeholder="All Conditions"
+                  >
+                    {conditionOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </Select>
+                </VStack>
+
+                {/* Price Range Filter */}
+                <VStack align="stretch" spacing={3}>
+                  <Text fontWeight="semibold">Price Range</Text>
+                  <RangeSlider
+                    value={localPriceRange}
+                    onChange={handlePriceChange}
+                    min={0}
+                    max={10000}
+                    step={100}
+                  >
+                    <RangeSliderTrack>
+                      <RangeSliderFilledTrack />
+                    </RangeSliderTrack>
+                    <RangeSliderThumb index={0} />
+                    <RangeSliderThumb index={1} />
+                  </RangeSlider>
+                  <HStack justify="space-between">
+                    <Text fontSize="sm">${localPriceRange[0]}</Text>
+                    <Text fontSize="sm">${localPriceRange[1]}</Text>
+                  </HStack>
+                </VStack>
+
+                <Divider />
+
+                {/* Apply Filters */}
+                <Button
+                  colorScheme="brand"
+                  onClick={applyFilters}
+                  size="lg"
+                >
+                  Apply Filters
+                </Button>
+
+                {/* Clear Filters */}
+                <Button
+                  variant="outline"
+                  leftIcon={<CloseIcon />}
+                  onClick={handleClearFilters}
+                  size="lg"
+                >
+                  Clear Filters
+                </Button>
+              </VStack>
+            </DrawerBody>
+          </DrawerContent>
+        </Drawer>
+      </Container>
+    </Box>
   );
 };
 

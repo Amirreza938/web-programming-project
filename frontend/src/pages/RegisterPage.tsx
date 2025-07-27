@@ -2,423 +2,379 @@ import React, { useState } from 'react';
 import {
   Box,
   Container,
-  Paper,
-  Typography,
-  TextField,
+  Heading,
+  Text,
   Button,
+  FormControl,
+  FormLabel,
+  Input,
+  InputGroup,
+  InputRightElement,
+  Select,
+  VStack,
+  HStack,
   Link,
   Alert,
-  CircularProgress,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  Grid,
+  AlertIcon,
+  useToast,
+  Card,
+  CardBody,
   Divider,
-} from '@mui/material';
+  Checkbox,
+  CheckboxGroup,
+  Textarea,
+  SimpleGrid,
+} from '@chakra-ui/react';
+import { ViewIcon, ViewOffIcon } from '@chakra-ui/icons';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 const RegisterPage: React.FC = () => {
   const navigate = useNavigate();
   const { register } = useAuth();
+  const toast = useToast();
+  
   const [formData, setFormData] = useState({
     username: '',
     email: '',
     password: '',
-    password_confirm: '',
-    first_name: '',
-    last_name: '',
-    user_type: 'buyer',
-    phone_number: '',
+    confirmPassword: '',
+    firstName: '',
+    lastName: '',
+    phone: '',
+    userType: 'buyer',
     address: '',
     city: '',
+    state: '',
+    zipCode: '',
     country: '',
-    postal_code: '',
   });
-  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [registerError, setRegisterError] = useState('');
+  const [error, setError] = useState('');
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | { name?: string; value: unknown }>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name as string]: value,
+      [name]: value,
     }));
-    // Clear error when user starts typing
-    if (errors[name as string]) {
-      setErrors(prev => ({
-        ...prev,
-        [name as string]: '',
-      }));
-    }
+    setError('');
   };
 
   const validateForm = () => {
-    const newErrors: { [key: string]: string } = {};
-
-    // Username validation
-    if (!formData.username.trim()) {
-      newErrors.username = 'Username is required';
-    } else if (formData.username.length < 3) {
-      newErrors.username = 'Username must be at least 3 characters';
-    } else if (!/^[a-zA-Z0-9_]+$/.test(formData.username)) {
-      newErrors.username = 'Username can only contain letters, numbers, and underscores';
+    if (formData.password !== formData.confirmPassword) {
+      setError('Passwords do not match');
+      return false;
     }
-
-    // Email validation
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email address';
+    if (formData.password.length < 8) {
+      setError('Password must be at least 8 characters long');
+      return false;
     }
-
-    // Password validation
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 8) {
-      newErrors.password = 'Password must be at least 8 characters';
-    } else if (!/(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/.test(formData.password)) {
-      newErrors.password = 'Password must contain at least one uppercase letter, one lowercase letter, and one number';
+    if (!agreedToTerms) {
+      setError('You must agree to the terms and conditions');
+      return false;
     }
-
-    // Password confirmation
-    if (!formData.password_confirm) {
-      newErrors.password_confirm = 'Please confirm your password';
-    } else if (formData.password !== formData.password_confirm) {
-      newErrors.password_confirm = 'Passwords do not match';
-    }
-
-    // Name validation
-    if (!formData.first_name.trim()) {
-      newErrors.first_name = 'First name is required';
-    }
-
-    if (!formData.last_name.trim()) {
-      newErrors.last_name = 'Last name is required';
-    }
-
-    // Phone number validation (optional but if provided, validate format)
-    if (formData.phone_number && !/^[\+]?[1-9][\d]{0,15}$/.test(formData.phone_number.replace(/\s/g, ''))) {
-      newErrors.phone_number = 'Please enter a valid phone number';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    return true;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setRegisterError('');
-
+    
     if (!validateForm()) {
       return;
     }
 
     setIsLoading(true);
+    setError('');
 
     try {
       await register(formData);
-      navigate('/dashboard');
-    } catch (error: any) {
-      console.error('Registration error:', error);
-      if (error.response?.data) {
-        const data = error.response.data;
-        if (typeof data === 'string') {
-          setRegisterError(data);
-        } else {
-          // Handle field-specific errors
-          const fieldErrors: { [key: string]: string } = {};
-          Object.keys(data).forEach(key => {
-            if (Array.isArray(data[key])) {
-              fieldErrors[key] = data[key][0];
-            } else {
-              fieldErrors[key] = data[key];
-            }
-          });
-          setErrors(fieldErrors);
-          
-          // Handle non-field errors
-          if (data.non_field_errors) {
-            setRegisterError(data.non_field_errors[0]);
-          }
-        }
-      } else {
-        setRegisterError('Registration failed. Please try again.');
-      }
+      toast({
+        title: 'Registration successful!',
+        description: 'Welcome to SecondHand! Please check your email to verify your account.',
+        status: 'success',
+        duration: 5000,
+        isClosable: true,
+      });
+      navigate('/login');
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Registration failed. Please try again.');
+      toast({
+        title: 'Registration failed',
+        description: err.response?.data?.message || 'Please check your information and try again.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <Container maxWidth="md">
-      <Box
-        sx={{
-          marginTop: 4,
-          marginBottom: 4,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-        }}
-      >
-        <Paper
-          elevation={3}
-          sx={{
-            padding: 4,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            width: '100%',
-          }}
-        >
-          <Typography component="h1" variant="h4" gutterBottom>
-            Create Account
-          </Typography>
-          <Typography variant="body2" color="text.secondary" align="center" sx={{ mb: 3 }}>
-            Join our community to start buying and selling second-hand items.
-          </Typography>
+    <Box minH="100vh" bg="gray.50" py={8}>
+      <Container maxW="2xl">
+        <VStack spacing={8}>
+          {/* Header */}
+          <VStack spacing={4} textAlign="center">
+            <Heading as="h1" size="xl" color="brand.500">
+              Create Your Account
+            </Heading>
+            <Text color="gray.600">
+              Join thousands of users buying and selling second-hand items
+            </Text>
+          </VStack>
 
-          {registerError && (
-            <Alert severity="error" sx={{ width: '100%', mb: 2 }}>
-              {registerError}
-            </Alert>
-          )}
+          {/* Registration Form */}
+          <Card w="full" shadow="md">
+            <CardBody p={8}>
+              <form onSubmit={handleSubmit}>
+                <VStack spacing={6}>
+                  {error && (
+                    <Alert status="error" borderRadius="md">
+                      <AlertIcon />
+                      {error}
+                    </Alert>
+                  )}
 
-          <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%' }}>
-            <Grid container spacing={2}>
-              {/* Basic Information */}
-              <Grid item xs={12}>
-                <Typography variant="h6" gutterBottom>
-                  Basic Information
-                </Typography>
-              </Grid>
-              
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  required
-                  fullWidth
-                  id="first_name"
-                  label="First Name"
-                  name="first_name"
-                  autoComplete="given-name"
-                  value={formData.first_name}
-                  onChange={handleInputChange}
-                  error={!!errors.first_name}
-                  helperText={errors.first_name}
-                  disabled={isLoading}
-                />
-              </Grid>
-              
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  required
-                  fullWidth
-                  id="last_name"
-                  label="Last Name"
-                  name="last_name"
-                  autoComplete="family-name"
-                  value={formData.last_name}
-                  onChange={handleInputChange}
-                  error={!!errors.last_name}
-                  helperText={errors.last_name}
-                  disabled={isLoading}
-                />
-              </Grid>
+                  {/* Account Information */}
+                  <VStack spacing={4} w="full">
+                    <Heading as="h3" size="md" alignSelf="flex-start">
+                      Account Information
+                    </Heading>
+                    
+                    <SimpleGrid columns={{ base: 1, md: 2 }} gap={4} w="full">
+                      <FormControl isRequired>
+                        <FormLabel>Username</FormLabel>
+                        <Input
+                          name="username"
+                          value={formData.username}
+                          onChange={handleChange}
+                          placeholder="Choose a username"
+                        />
+                      </FormControl>
 
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  required
-                  fullWidth
-                  id="username"
-                  label="Username"
-                  name="username"
-                  autoComplete="username"
-                  value={formData.username}
-                  onChange={handleInputChange}
-                  error={!!errors.username}
-                  helperText={errors.username}
-                  disabled={isLoading}
-                />
-              </Grid>
+                      <FormControl isRequired>
+                        <FormLabel>Email</FormLabel>
+                        <Input
+                          name="email"
+                          type="email"
+                          value={formData.email}
+                          onChange={handleChange}
+                          placeholder="Enter your email"
+                        />
+                      </FormControl>
+                    </SimpleGrid>
 
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  required
-                  fullWidth
-                  id="email"
-                  label="Email Address"
-                  name="email"
-                  autoComplete="email"
-                  type="email"
-                  value={formData.email}
-                  onChange={handleInputChange}
-                  error={!!errors.email}
-                  helperText={errors.email}
-                  disabled={isLoading}
-                />
-              </Grid>
+                    <SimpleGrid columns={{ base: 1, md: 2 }} gap={4} w="full">
+                      <FormControl isRequired>
+                        <FormLabel>Password</FormLabel>
+                        <InputGroup>
+                          <Input
+                            name="password"
+                            type={showPassword ? 'text' : 'password'}
+                            value={formData.password}
+                            onChange={handleChange}
+                            placeholder="Create a password"
+                          />
+                          <InputRightElement>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setShowPassword(!showPassword)}
+                            >
+                              {showPassword ? <ViewOffIcon /> : <ViewIcon />}
+                            </Button>
+                          </InputRightElement>
+                        </InputGroup>
+                      </FormControl>
 
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  required
-                  fullWidth
-                  name="password"
-                  label="Password"
-                  type="password"
-                  id="password"
-                  autoComplete="new-password"
-                  value={formData.password}
-                  onChange={handleInputChange}
-                  error={!!errors.password}
-                  helperText={errors.password}
-                  disabled={isLoading}
-                />
-              </Grid>
+                      <FormControl isRequired>
+                        <FormLabel>Confirm Password</FormLabel>
+                        <InputGroup>
+                          <Input
+                            name="confirmPassword"
+                            type={showConfirmPassword ? 'text' : 'password'}
+                            value={formData.confirmPassword}
+                            onChange={handleChange}
+                            placeholder="Confirm your password"
+                          />
+                          <InputRightElement>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                            >
+                              {showConfirmPassword ? <ViewOffIcon /> : <ViewIcon />}
+                            </Button>
+                          </InputRightElement>
+                        </InputGroup>
+                      </FormControl>
+                    </SimpleGrid>
+                  </VStack>
 
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  required
-                  fullWidth
-                  name="password_confirm"
-                  label="Confirm Password"
-                  type="password"
-                  id="password_confirm"
-                  autoComplete="new-password"
-                  value={formData.password_confirm}
-                  onChange={handleInputChange}
-                  error={!!errors.password_confirm}
-                  helperText={errors.password_confirm}
-                  disabled={isLoading}
-                />
-              </Grid>
+                  {/* Personal Information */}
+                  <VStack spacing={4} w="full">
+                    <Heading as="h3" size="md" alignSelf="flex-start">
+                      Personal Information
+                    </Heading>
+                    
+                    <SimpleGrid columns={{ base: 1, md: 2 }} gap={4} w="full">
+                      <FormControl isRequired>
+                        <FormLabel>First Name</FormLabel>
+                        <Input
+                          name="firstName"
+                          value={formData.firstName}
+                          onChange={handleChange}
+                          placeholder="Enter your first name"
+                        />
+                      </FormControl>
 
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth required>
-                  <InputLabel id="user-type-label">Account Type</InputLabel>
-                  <Select
-                    labelId="user-type-label"
-                    id="user_type"
-                    name="user_type"
-                    value={formData.user_type}
-                    label="Account Type"
-                    onChange={handleInputChange}
-                    disabled={isLoading}
-                  >
-                    <MenuItem value="buyer">Buyer</MenuItem>
-                    <MenuItem value="seller">Seller</MenuItem>
-                    <MenuItem value="both">Both (Buyer & Seller)</MenuItem>
-                  </Select>
-                </FormControl>
-              </Grid>
+                      <FormControl isRequired>
+                        <FormLabel>Last Name</FormLabel>
+                        <Input
+                          name="lastName"
+                          value={formData.lastName}
+                          onChange={handleChange}
+                          placeholder="Enter your last name"
+                        />
+                      </FormControl>
+                    </SimpleGrid>
 
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  id="phone_number"
-                  label="Phone Number"
-                  name="phone_number"
-                  autoComplete="tel"
-                  value={formData.phone_number}
-                  onChange={handleInputChange}
-                  error={!!errors.phone_number}
-                  helperText={errors.phone_number}
-                  disabled={isLoading}
-                />
-              </Grid>
+                    <SimpleGrid columns={{ base: 1, md: 2 }} gap={4} w="full">
+                      <FormControl>
+                        <FormLabel>Phone Number</FormLabel>
+                        <Input
+                          name="phone"
+                          value={formData.phone}
+                          onChange={handleChange}
+                          placeholder="Enter your phone number"
+                        />
+                      </FormControl>
 
-              {/* Address Information */}
-              <Grid item xs={12}>
-                <Divider sx={{ my: 2 }} />
-                <Typography variant="h6" gutterBottom>
-                  Address Information (Optional)
-                </Typography>
-              </Grid>
+                      <FormControl isRequired>
+                        <FormLabel>Account Type</FormLabel>
+                        <Select
+                          name="userType"
+                          value={formData.userType}
+                          onChange={handleChange}
+                        >
+                          <option value="buyer">Buyer</option>
+                          <option value="seller">Seller</option>
+                          <option value="both">Both (Buy & Sell)</option>
+                        </Select>
+                      </FormControl>
+                    </SimpleGrid>
+                  </VStack>
 
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  id="address"
-                  label="Address"
-                  name="address"
-                  autoComplete="street-address"
-                  multiline
-                  rows={2}
-                  value={formData.address}
-                  onChange={handleInputChange}
-                  disabled={isLoading}
-                />
-              </Grid>
+                  {/* Address Information */}
+                  <VStack spacing={4} w="full">
+                    <Heading as="h3" size="md" alignSelf="flex-start">
+                      Address Information (Optional)
+                    </Heading>
+                    
+                    <FormControl>
+                      <FormLabel>Street Address</FormLabel>
+                      <Textarea
+                        name="address"
+                        value={formData.address}
+                        onChange={handleChange}
+                        placeholder="Enter your street address"
+                        rows={2}
+                      />
+                    </FormControl>
 
-              <Grid item xs={12} sm={4}>
-                <TextField
-                  fullWidth
-                  id="city"
-                  label="City"
-                  name="city"
-                  autoComplete="address-level2"
-                  value={formData.city}
-                  onChange={handleInputChange}
-                  disabled={isLoading}
-                />
-              </Grid>
+                    <SimpleGrid columns={{ base: 1, md: 3 }} gap={4} w="full">
+                      <FormControl>
+                        <FormLabel>City</FormLabel>
+                        <Input
+                          name="city"
+                          value={formData.city}
+                          onChange={handleChange}
+                          placeholder="City"
+                        />
+                      </FormControl>
 
-              <Grid item xs={12} sm={4}>
-                <TextField
-                  fullWidth
-                  id="country"
-                  label="Country"
-                  name="country"
-                  autoComplete="country-name"
-                  value={formData.country}
-                  onChange={handleInputChange}
-                  disabled={isLoading}
-                />
-              </Grid>
+                      <FormControl>
+                        <FormLabel>State/Province</FormLabel>
+                        <Input
+                          name="state"
+                          value={formData.state}
+                          onChange={handleChange}
+                          placeholder="State"
+                        />
+                      </FormControl>
 
-              <Grid item xs={12} sm={4}>
-                <TextField
-                  fullWidth
-                  id="postal_code"
-                  label="Postal Code"
-                  name="postal_code"
-                  autoComplete="postal-code"
-                  value={formData.postal_code}
-                  onChange={handleInputChange}
-                  disabled={isLoading}
-                />
-              </Grid>
-            </Grid>
+                      <FormControl>
+                        <FormLabel>ZIP/Postal Code</FormLabel>
+                        <Input
+                          name="zipCode"
+                          value={formData.zipCode}
+                          onChange={handleChange}
+                          placeholder="ZIP Code"
+                        />
+                      </FormControl>
+                    </SimpleGrid>
 
-            <Button
-              type="submit"
-              fullWidth
-              variant="contained"
-              sx={{ mt: 3, mb: 2, py: 1.5 }}
-              disabled={isLoading}
-            >
-              {isLoading ? <CircularProgress size={24} /> : 'Create Account'}
-            </Button>
-          </Box>
+                    <FormControl>
+                      <FormLabel>Country</FormLabel>
+                      <Input
+                        name="country"
+                        value={formData.country}
+                        onChange={handleChange}
+                        placeholder="Country"
+                      />
+                    </FormControl>
+                  </VStack>
 
-          <Divider sx={{ width: '100%', my: 2 }}>
-            <Typography variant="body2" color="text.secondary">
-              OR
-            </Typography>
-          </Divider>
+                  {/* Terms and Conditions */}
+                  <VStack spacing={4} w="full">
+                    <Checkbox
+                      isChecked={agreedToTerms}
+                      onChange={(e) => setAgreedToTerms(e.target.checked)}
+                      colorScheme="brand"
+                    >
+                      I agree to the{' '}
+                      <Link color="brand.500" href="/terms" isExternal>
+                        Terms of Service
+                      </Link>{' '}
+                      and{' '}
+                      <Link color="brand.500" href="/privacy" isExternal>
+                        Privacy Policy
+                      </Link>
+                    </Checkbox>
 
-          <Box sx={{ textAlign: 'center', width: '100%' }}>
-            <Typography variant="body2" color="text.secondary">
-              Already have an account?{' '}
-              <Link component={RouterLink} to="/login" variant="body2">
-                Sign in here
+                    <Button
+                      type="submit"
+                      colorScheme="brand"
+                      size="lg"
+                      w="full"
+                      isLoading={isLoading}
+                      loadingText="Creating account..."
+                    >
+                      Create Account
+                    </Button>
+                  </VStack>
+                </VStack>
+              </form>
+            </CardBody>
+          </Card>
+
+          {/* Footer */}
+          <VStack spacing={4}>
+            <HStack>
+              <Text color="gray.600">Already have an account?</Text>
+              <Link as={RouterLink} to="/login" color="brand.500" fontWeight="semibold">
+                Sign In
               </Link>
-            </Typography>
-          </Box>
-        </Paper>
-      </Box>
-    </Container>
+            </HStack>
+          </VStack>
+        </VStack>
+      </Container>
+    </Box>
   );
 };
 

@@ -183,7 +183,10 @@ class Command(BaseCommand):
                 'city': 'New York',
                 'country': 'USA',
                 'shipping_options': ['post', 'pickup'],
-                'shipping_cost': Decimal('15.00')
+                'shipping_cost': Decimal('15.00'),
+                'images': [
+                    'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=800&q=80',
+                ]
             },
             {
                 'seller': john,
@@ -200,7 +203,10 @@ class Command(BaseCommand):
                 'city': 'New York',
                 'country': 'USA',
                 'shipping_options': ['post', 'pickup'],
-                'shipping_cost': Decimal('25.00')
+                'shipping_cost': Decimal('25.00'),
+                'images': [
+                    'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=800&q=80',
+                ]
             },
             {
                 'seller': jane,
@@ -217,7 +223,10 @@ class Command(BaseCommand):
                 'city': 'Los Angeles',
                 'country': 'USA',
                 'shipping_options': ['post', 'pickup'],
-                'shipping_cost': Decimal('20.00')
+                'shipping_cost': Decimal('20.00'),
+                'images': [
+                    'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=800&q=80',
+                ]
             },
             {
                 'seller': jane,
@@ -234,7 +243,10 @@ class Command(BaseCommand):
                 'city': 'Los Angeles',
                 'country': 'USA',
                 'shipping_options': ['pickup'],
-                'shipping_cost': Decimal('0.00')
+                'shipping_cost': Decimal('0.00'),
+                'images': [
+                    'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80',
+                ]
             },
             {
                 'seller': john,
@@ -251,15 +263,26 @@ class Command(BaseCommand):
                 'city': 'New York',
                 'country': 'USA',
                 'shipping_options': ['post', 'pickup'],
-                'shipping_cost': Decimal('10.00')
+                'shipping_cost': Decimal('10.00'),
+                'images': [
+                    'https://images.unsplash.com/photo-1511367461989-f85a21fda167?auto=format&fit=crop&w=800&q=80',
+                ]
             }
         ]
         
         for product_data in products_data:
+            images = product_data.pop('images', [])
             product, created = Product.objects.get_or_create(
                 title=product_data['title'],
                 seller=product_data['seller'],
                 defaults=product_data
             )
             if created:
-                self.stdout.write(f'Created product: {product.title}') 
+                self.stdout.write(f'Created product: {product.title}')
+                # Add images
+                for idx, img_url in enumerate(images):
+                    ProductImage.objects.create(
+                        product=product,
+                        image=img_url,
+                        is_main=(idx == 0)
+                    ) 

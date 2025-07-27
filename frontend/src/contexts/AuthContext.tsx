@@ -53,10 +53,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const login = async (username: string, password: string) => {
     try {
-      const response = await apiService.login(username, password);
+      const response = await apiService.login({ username, password });
       
-      localStorage.setItem('access_token', response.tokens.access);
-      localStorage.setItem('refresh_token', response.tokens.refresh);
+      localStorage.setItem('access_token', response.access);
+      localStorage.setItem('refresh_token', response.refresh);
       localStorage.setItem('user', JSON.stringify(response.user));
       
       setUser(response.user);
@@ -70,8 +70,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     try {
       const response = await apiService.register(userData);
       
-      localStorage.setItem('access_token', response.tokens.access);
-      localStorage.setItem('refresh_token', response.tokens.refresh);
+      localStorage.setItem('access_token', response.access);
+      localStorage.setItem('refresh_token', response.refresh);
       localStorage.setItem('user', JSON.stringify(response.user));
       
       setUser(response.user);
@@ -88,6 +88,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       console.error('Logout error:', error);
     } finally {
       setUser(null);
+      localStorage.removeItem('access_token');
+      localStorage.removeItem('refresh_token');
+      localStorage.removeItem('user');
     }
   };
 

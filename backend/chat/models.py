@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Q
 from users.models import User
 from products.models import Product
 
@@ -29,16 +30,14 @@ class Conversation(models.Model):
     def get_unread_count(self, user):
         """Get unread message count for a user"""
         return self.messages.filter(
-            sender__in=[self.buyer, self.seller],
-            sender__ne=user,
+            ~Q(sender=user),
             is_read=False
         ).count()
     
     def mark_as_read(self, user):
         """Mark all messages as read for a user"""
         self.messages.filter(
-            sender__in=[self.buyer, self.seller],
-            sender__ne=user,
+            ~Q(sender=user),
             is_read=False
         ).update(is_read=True)
 

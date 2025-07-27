@@ -2,180 +2,181 @@ import React, { useState } from 'react';
 import {
   Box,
   Container,
-  Paper,
-  Typography,
-  TextField,
+  Heading,
+  Text,
   Button,
+  FormControl,
+  FormLabel,
+  Input,
+  InputGroup,
+  InputRightElement,
+  VStack,
+  HStack,
   Link,
   Alert,
-  CircularProgress,
+  AlertIcon,
+  useToast,
+  Card,
+  CardBody,
   Divider,
-} from '@mui/material';
+} from '@chakra-ui/react';
+import { ViewIcon, ViewOffIcon } from '@chakra-ui/icons';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
 const LoginPage: React.FC = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
+  const toast = useToast();
+  
   const [formData, setFormData] = useState({
     username: '',
     password: '',
   });
-  const [errors, setErrors] = useState<{ [key: string]: string }>({});
+  const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [loginError, setLoginError] = useState('');
+  const [error, setError] = useState('');
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({
       ...prev,
       [name]: value,
     }));
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: '',
-      }));
-    }
-  };
-
-  const validateForm = () => {
-    const newErrors: { [key: string]: string } = {};
-
-    if (!formData.username.trim()) {
-      newErrors.username = 'Username is required';
-    }
-
-    if (!formData.password) {
-      newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+    setError(''); // Clear error when user starts typing
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setLoginError('');
-
-    if (!validateForm()) {
-      return;
-    }
-
     setIsLoading(true);
+    setError('');
 
     try {
       await login(formData.username, formData.password);
+      toast({
+        title: 'Login successful!',
+        description: 'Welcome back!',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
       navigate('/dashboard');
-    } catch (error: any) {
-      console.error('Login error:', error);
-      if (error.response?.data?.detail) {
-        setLoginError(error.response.data.detail);
-      } else if (error.response?.data?.non_field_errors) {
-        setLoginError(error.response.data.non_field_errors[0]);
-      } else {
-        setLoginError('Login failed. Please check your credentials and try again.');
-      }
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Login failed. Please try again.');
+      toast({
+        title: 'Login failed',
+        description: err.response?.data?.message || 'Please check your credentials and try again.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <Container maxWidth="sm">
-      <Box
-        sx={{
-          marginTop: 8,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-        }}
-      >
-        <Paper
-          elevation={3}
-          sx={{
-            padding: 4,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            width: '100%',
-          }}
-        >
-          <Typography component="h1" variant="h4" gutterBottom>
-            Sign In
-          </Typography>
-          <Typography variant="body2" color="text.secondary" align="center" sx={{ mb: 3 }}>
-            Welcome back! Sign in to your account to continue buying and selling.
-          </Typography>
+    <Box minH="100vh" bg="gray.50" py={12}>
+      <Container maxW="md">
+        <VStack spacing={8}>
+          {/* Header */}
+          <VStack spacing={4} textAlign="center">
+            <Heading as="h1" size="xl" color="brand.500">
+              Welcome Back
+            </Heading>
+            <Text color="gray.600">
+              Sign in to your account to continue
+            </Text>
+          </VStack>
 
-          {loginError && (
-            <Alert severity="error" sx={{ width: '100%', mb: 2 }}>
-              {loginError}
-            </Alert>
-          )}
+          {/* Login Form */}
+          <Card w="full" shadow="md">
+            <CardBody p={8}>
+              <form onSubmit={handleSubmit}>
+                <VStack spacing={6}>
+                  {error && (
+                    <Alert status="error" borderRadius="md">
+                      <AlertIcon />
+                      {error}
+                    </Alert>
+                  )}
 
-          <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%' }}>
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              id="username"
-              label="Username"
-              name="username"
-              autoComplete="username"
-              autoFocus
-              value={formData.username}
-              onChange={handleInputChange}
-              error={!!errors.username}
-              helperText={errors.username}
-              disabled={isLoading}
-            />
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              name="password"
-              label="Password"
-              type="password"
-              id="password"
-              autoComplete="current-password"
-              value={formData.password}
-              onChange={handleInputChange}
-              error={!!errors.password}
-              helperText={errors.password}
-              disabled={isLoading}
-            />
-            <Button
-              type="submit"
-              fullWidth
-              variant="contained"
-              sx={{ mt: 3, mb: 2, py: 1.5 }}
-              disabled={isLoading}
-            >
-              {isLoading ? <CircularProgress size={24} /> : 'Sign In'}
-            </Button>
-          </Box>
+                  <FormControl isRequired>
+                    <FormLabel>Username or Email</FormLabel>
+                    <Input
+                      name="username"
+                      type="text"
+                      value={formData.username}
+                      onChange={handleChange}
+                      placeholder="Enter your username or email"
+                      size="lg"
+                    />
+                  </FormControl>
 
-          <Divider sx={{ width: '100%', my: 2 }}>
-            <Typography variant="body2" color="text.secondary">
-              OR
-            </Typography>
-          </Divider>
+                  <FormControl isRequired>
+                    <FormLabel>Password</FormLabel>
+                    <InputGroup size="lg">
+                      <Input
+                        name="password"
+                        type={showPassword ? 'text' : 'password'}
+                        value={formData.password}
+                        onChange={handleChange}
+                        placeholder="Enter your password"
+                      />
+                      <InputRightElement>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowPassword(!showPassword)}
+                        >
+                          {showPassword ? <ViewOffIcon /> : <ViewIcon />}
+                        </Button>
+                      </InputRightElement>
+                    </InputGroup>
+                  </FormControl>
 
-          <Box sx={{ textAlign: 'center', width: '100%' }}>
-            <Typography variant="body2" color="text.secondary">
-              Don't have an account?{' '}
-              <Link component={RouterLink} to="/register" variant="body2">
-                Sign up here
+                  <Button
+                    type="submit"
+                    colorScheme="brand"
+                    size="lg"
+                    w="full"
+                    isLoading={isLoading}
+                    loadingText="Signing in..."
+                  >
+                    Sign In
+                  </Button>
+                </VStack>
+              </form>
+            </CardBody>
+          </Card>
+
+          {/* Footer Links */}
+          <VStack spacing={4} w="full">
+            <HStack justify="space-between" w="full">
+              <Link as={RouterLink} to="/forgot-password" color="brand.500">
+                Forgot password?
               </Link>
-            </Typography>
-          </Box>
-        </Paper>
-      </Box>
-    </Container>
+              <Link as={RouterLink} to="/register" color="brand.500">
+                Create account
+              </Link>
+            </HStack>
+
+            <Divider />
+
+            <Text fontSize="sm" color="gray.600" textAlign="center">
+              By signing in, you agree to our{' '}
+              <Link color="brand.500" href="/terms">
+                Terms of Service
+              </Link>{' '}
+              and{' '}
+              <Link color="brand.500" href="/privacy">
+                Privacy Policy
+              </Link>
+            </Text>
+          </VStack>
+        </VStack>
+      </Container>
+    </Box>
   );
 };
 

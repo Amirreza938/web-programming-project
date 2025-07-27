@@ -2,130 +2,88 @@ import React, { useState } from 'react';
 import {
   Box,
   Container,
-  Paper,
-  Typography,
-  TextField,
+  Heading,
+  Text,
   Button,
-  Avatar,
-  Grid,
-  Chip,
-  Alert,
-  CircularProgress,
-  Divider,
-  Stack,
   FormControl,
-  InputLabel,
+  FormLabel,
+  Input,
   Select,
-  MenuItem,
-} from '@mui/material';
-import {
-  Edit,
-  Save,
-  Cancel,
-  Verified,
-  Person,
-  Email,
-  Phone,
-  LocationOn,
-} from '@mui/icons-material';
+  Textarea,
+  VStack,
+  HStack,
+  Card,
+  CardBody,
+  Avatar,
+  Badge,
+  Divider,
+  useToast,
+  SimpleGrid,
+  useColorModeValue,
+  Alert,
+  AlertIcon,
+} from '@chakra-ui/react';
+import { EditIcon, StarIcon, CalendarIcon } from '@chakra-ui/icons';
 import { useAuth } from '../contexts/AuthContext';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiService } from '../services/api';
+import LoadingSpinner from '../components/common/LoadingSpinner';
 
 const ProfilePage: React.FC = () => {
   const { user, updateUser } = useAuth();
+  const toast = useToast();
+  const queryClient = useQueryClient();
+  const cardBg = useColorModeValue('white', 'gray.700');
+
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     first_name: user?.first_name || '',
     last_name: user?.last_name || '',
     email: user?.email || '',
-    phone_number: user?.phone_number || '',
+    phone: user?.phone || '',
     address: user?.address || '',
     city: user?.city || '',
+    state: user?.state || '',
+    zip_code: user?.zip_code || '',
     country: user?.country || '',
-    postal_code: user?.postal_code || '',
+    bio: user?.bio || '',
   });
-  const [errors, setErrors] = useState<{ [key: string]: string }>({});
-  const [isLoading, setIsLoading] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
 
   const updateProfileMutation = useMutation({
-    mutationFn: async (userData: any) => {
-      return await apiService.updateProfile(userData);
-    },
+    mutationFn: (data: any) => apiService.updateProfile(data),
     onSuccess: (updatedUser) => {
       updateUser(updatedUser);
       setIsEditing(false);
-      setSuccessMessage('Profile updated successfully!');
-      setTimeout(() => setSuccessMessage(''), 3000);
+      toast({
+        title: 'Profile updated successfully!',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+      queryClient.invalidateQueries({ queryKey: ['user'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: 'Error updating profile',
+        description: error.response?.data?.message || 'Please try again.',
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
     },
   });
 
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+    const { name, value, type } = e.target;
     setFormData(prev => ({
       ...prev,
-      [name]: value,
+      [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
     }));
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: '',
-      }));
-    }
   };
 
-  const validateForm = () => {
-    const newErrors: { [key: string]: string } = {};
-
-    if (!formData.first_name.trim()) {
-      newErrors.first_name = 'First name is required';
-    }
-
-    if (!formData.last_name.trim()) {
-      newErrors.last_name = 'Last name is required';
-    }
-
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/\S+@\S+\.\S+/.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email address';
-    }
-
-    if (formData.phone_number && !/^[\+]?[1-9][\d]{0,15}$/.test(formData.phone_number.replace(/\s/g, ''))) {
-      newErrors.phone_number = 'Please enter a valid phone number';
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSave = async () => {
-    if (!validateForm()) {
-      return;
-    }
-
-    setIsLoading(true);
-    try {
-      await updateProfileMutation.mutateAsync(formData);
-    } catch (error: any) {
-      console.error('Error updating profile:', error);
-      if (error.response?.data) {
-        const data = error.response.data;
-        const fieldErrors: { [key: string]: string } = {};
-        Object.keys(data).forEach(key => {
-          if (Array.isArray(data[key])) {
-            fieldErrors[key] = data[key][0];
-          } else {
-            fieldErrors[key] = data[key];
-          }
-        });
-        setErrors(fieldErrors);
-      }
-    } finally {
-      setIsLoading(false);
-    }
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateProfileMutation.mutate(formData);
   };
 
   const handleCancel = () => {
@@ -133,301 +91,274 @@ const ProfilePage: React.FC = () => {
       first_name: user?.first_name || '',
       last_name: user?.last_name || '',
       email: user?.email || '',
-      phone_number: user?.phone_number || '',
+      phone: user?.phone || '',
       address: user?.address || '',
       city: user?.city || '',
+      state: user?.state || '',
+      zip_code: user?.zip_code || '',
       country: user?.country || '',
-      postal_code: user?.postal_code || '',
+      bio: user?.bio || '',
     });
-    setErrors({});
     setIsEditing(false);
   };
 
-  const getVerificationStatusColor = (status: string) => {
-    switch (status) {
-      case 'verified':
-        return 'success';
-      case 'pending':
-        return 'warning';
-      case 'rejected':
-        return 'error';
-      default:
-        return 'default';
-    }
-  };
-
-  const getVerificationStatusText = (status: string) => {
-    switch (status) {
-      case 'verified':
-        return 'Verified Seller';
-      case 'pending':
-        return 'Verification Pending';
-      case 'rejected':
-        return 'Verification Rejected';
-      default:
-        return 'Not Verified';
-    }
-  };
-
   if (!user) {
-    return null;
+    return <LoadingSpinner />;
   }
 
   return (
-    <Container maxWidth="md">
-      <Box sx={{ py: 3 }}>
-        <Typography variant="h4" gutterBottom>
-          Profile
-        </Typography>
+    <Box minH="100vh" bg="gray.50" py={8}>
+      <Container maxW="1000px">
+        <VStack spacing={8} align="stretch">
+          {/* Header */}
+          <VStack spacing={4} textAlign="center">
+            <Heading as="h1" size="xl" color="brand.500">
+              My Profile
+            </Heading>
+            <Text color="gray.600">
+              Manage your account information and preferences
+            </Text>
+          </VStack>
 
-        {successMessage && (
-          <Alert severity="success" sx={{ mb: 3 }}>
-            {successMessage}
-          </Alert>
-        )}
+          <SimpleGrid columns={{ base: 1, lg: 3 }} gap={8}>
+            {/* Profile Overview */}
+            <Box gridColumn={{ lg: 'span 1' }}>
+              <Card bg={cardBg} shadow="md">
+                <CardBody p={6}>
+                  <VStack spacing={6} align="center">
+                    <Avatar
+                      size="2xl"
+                      name={`${user.first_name} ${user.last_name}`}
+                      src={user.profile_image}
+                    />
+                    
+                    <VStack spacing={2} textAlign="center">
+                      <Heading as="h2" size="lg">
+                        {`${user.first_name} ${user.last_name}`}
+                      </Heading>
+                      <Text color="gray.600">{user.email}</Text>
+                      
+                      <HStack spacing={2}>
+                        <Badge colorScheme="blue" variant="outline">
+                          {user.user_type}
+                        </Badge>
+                        {user.is_verified && (
+                          <Badge colorScheme="green" variant="outline">
+                            Verified
+                          </Badge>
+                        )}
+                      </HStack>
+                    </VStack>
 
-        <Paper sx={{ p: 4 }}>
-          {/* Profile Header */}
-          <Box sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
-            <Avatar
-              sx={{
-                width: 100,
-                height: 100,
-                bgcolor: 'primary.main',
-                fontSize: '2rem',
-                mr: 3,
-              }}
-            >
-              {user.profile_image ? (
-                <img
-                  src={user.profile_image}
-                  alt={user.first_name}
-                  style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-                />
-              ) : (
-                user.first_name?.[0] || user.username[0]
-              )}
-            </Avatar>
-            <Box sx={{ flexGrow: 1 }}>
-              <Typography variant="h5" gutterBottom>
-                {user.first_name} {user.last_name}
-              </Typography>
-              <Typography variant="body1" color="text.secondary" gutterBottom>
-                @{user.username}
-              </Typography>
-              <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-                <Chip
-                  label={user.user_type}
-                  color="primary"
-                  variant="outlined"
-                />
-                <Chip
-                  label={getVerificationStatusText(user.verification_status)}
-                  color={getVerificationStatusColor(user.verification_status) as any}
-                  icon={user.verification_status === 'verified' ? <Verified /> : undefined}
-                />
-                {user.is_premium && (
-                  <Chip
-                    label="Premium"
-                    color="secondary"
-                  />
-                )}
-              </Box>
+                    <Divider />
+
+                    <VStack spacing={3} align="start" w="full">
+                      <HStack spacing={2} color="gray.600">
+                        <StarIcon />
+                        <Text fontSize="sm">
+                          {user.average_rating || 'No ratings'} ({user.total_ratings || 0} reviews)
+                        </Text>
+                      </HStack>
+                      
+                      <HStack spacing={2} color="gray.600">
+                        <CalendarIcon />
+                        <Text fontSize="sm">
+                          Member since {new Date(user.date_joined).toLocaleDateString()}
+                        </Text>
+                      </HStack>
+                    </VStack>
+
+                    {!isEditing && (
+                      <Button
+                        leftIcon={<EditIcon />}
+                        colorScheme="brand"
+                        onClick={() => setIsEditing(true)}
+                        w="full"
+                      >
+                        Edit Profile
+                      </Button>
+                    )}
+                  </VStack>
+                </CardBody>
+              </Card>
             </Box>
-            <Button
-              variant={isEditing ? "outlined" : "contained"}
-              startIcon={isEditing ? <Cancel /> : <Edit />}
-              onClick={isEditing ? handleCancel : () => setIsEditing(true)}
-              disabled={isLoading}
-            >
-              {isEditing ? 'Cancel' : 'Edit Profile'}
-            </Button>
-          </Box>
 
-          <Divider sx={{ mb: 4 }} />
+            {/* Profile Form */}
+            <Box gridColumn={{ lg: 'span 2' }}>
+              <Card bg={cardBg} shadow="md">
+                <CardBody p={6}>
+                  <form onSubmit={handleSubmit}>
+                    <VStack spacing={6}>
+                      {/* Account Type Alert */}
+                      {user.user_type === 'seller' && !user.is_verified && (
+                        <Alert status="warning">
+                          <AlertIcon />
+                          <VStack align="start" spacing={1}>
+                            <Text fontWeight="semibold">Seller Verification Required</Text>
+                            <Text fontSize="sm">
+                              Complete seller verification to unlock all features and build trust with buyers.
+                            </Text>
+                          </VStack>
+                        </Alert>
+                      )}
 
-          {/* Profile Form */}
-          <Grid container spacing={3}>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="First Name"
-                name="first_name"
-                value={formData.first_name}
-                onChange={handleInputChange}
-                error={!!errors.first_name}
-                helperText={errors.first_name}
-                disabled={!isEditing}
-                InputProps={{
-                  startAdornment: <Person sx={{ mr: 1, color: 'action.active' }} />,
-                }}
-              />
-            </Grid>
+                      {/* Personal Information */}
+                      <VStack spacing={4} align="stretch" w="full">
+                        <Heading as="h3" size="md">
+                          Personal Information
+                        </Heading>
+                        
+                        <SimpleGrid columns={{ base: 1, md: 2 }} gap={4}>
+                          <FormControl isRequired>
+                            <FormLabel>First Name</FormLabel>
+                            <Input
+                              name="first_name"
+                              value={formData.first_name}
+                              onChange={handleInputChange}
+                              isDisabled={!isEditing}
+                            />
+                          </FormControl>
 
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Last Name"
-                name="last_name"
-                value={formData.last_name}
-                onChange={handleInputChange}
-                error={!!errors.last_name}
-                helperText={errors.last_name}
-                disabled={!isEditing}
-                InputProps={{
-                  startAdornment: <Person sx={{ mr: 1, color: 'action.active' }} />,
-                }}
-              />
-            </Grid>
+                          <FormControl isRequired>
+                            <FormLabel>Last Name</FormLabel>
+                            <Input
+                              name="last_name"
+                              value={formData.last_name}
+                              onChange={handleInputChange}
+                              isDisabled={!isEditing}
+                            />
+                          </FormControl>
+                        </SimpleGrid>
 
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Email"
-                name="email"
-                type="email"
-                value={formData.email}
-                onChange={handleInputChange}
-                error={!!errors.email}
-                helperText={errors.email}
-                disabled={!isEditing}
-                InputProps={{
-                  startAdornment: <Email sx={{ mr: 1, color: 'action.active' }} />,
-                }}
-              />
-            </Grid>
+                        <SimpleGrid columns={{ base: 1, md: 2 }} gap={4}>
+                          <FormControl isRequired>
+                            <FormLabel>Email</FormLabel>
+                            <Input
+                              name="email"
+                              type="email"
+                              value={formData.email}
+                              onChange={handleInputChange}
+                              isDisabled={!isEditing}
+                            />
+                          </FormControl>
 
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Phone Number"
-                name="phone_number"
-                value={formData.phone_number}
-                onChange={handleInputChange}
-                error={!!errors.phone_number}
-                helperText={errors.phone_number}
-                disabled={!isEditing}
-                InputProps={{
-                  startAdornment: <Phone sx={{ mr: 1, color: 'action.active' }} />,
-                }}
-              />
-            </Grid>
+                          <FormControl>
+                            <FormLabel>Phone</FormLabel>
+                            <Input
+                              name="phone"
+                              value={formData.phone}
+                              onChange={handleInputChange}
+                              isDisabled={!isEditing}
+                            />
+                          </FormControl>
+                        </SimpleGrid>
 
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Address"
-                name="address"
-                multiline
-                rows={2}
-                value={formData.address}
-                onChange={handleInputChange}
-                disabled={!isEditing}
-                InputProps={{
-                  startAdornment: <LocationOn sx={{ mr: 1, color: 'action.active' }} />,
-                }}
-              />
-            </Grid>
+                        <FormControl>
+                          <FormLabel>Bio</FormLabel>
+                          <Textarea
+                            name="bio"
+                            value={formData.bio}
+                            onChange={handleInputChange}
+                            placeholder="Tell us about yourself..."
+                            rows={3}
+                            isDisabled={!isEditing}
+                          />
+                        </FormControl>
+                      </VStack>
 
-            <Grid item xs={12} sm={4}>
-              <TextField
-                fullWidth
-                label="City"
-                name="city"
-                value={formData.city}
-                onChange={handleInputChange}
-                disabled={!isEditing}
-              />
-            </Grid>
+                      <Divider />
 
-            <Grid item xs={12} sm={4}>
-              <TextField
-                fullWidth
-                label="Country"
-                name="country"
-                value={formData.country}
-                onChange={handleInputChange}
-                disabled={!isEditing}
-              />
-            </Grid>
+                      {/* Address Information */}
+                      <VStack spacing={4} align="stretch" w="full">
+                        <Heading as="h3" size="md">
+                          Address Information
+                        </Heading>
+                        
+                        <FormControl>
+                          <FormLabel>Street Address</FormLabel>
+                          <Input
+                            name="address"
+                            value={formData.address}
+                            onChange={handleInputChange}
+                            isDisabled={!isEditing}
+                          />
+                        </FormControl>
 
-            <Grid item xs={12} sm={4}>
-              <TextField
-                fullWidth
-                label="Postal Code"
-                name="postal_code"
-                value={formData.postal_code}
-                onChange={handleInputChange}
-                disabled={!isEditing}
-              />
-            </Grid>
-          </Grid>
+                        <SimpleGrid columns={{ base: 1, md: 3 }} gap={4}>
+                          <FormControl>
+                            <FormLabel>City</FormLabel>
+                            <Input
+                              name="city"
+                              value={formData.city}
+                              onChange={handleInputChange}
+                              isDisabled={!isEditing}
+                            />
+                          </FormControl>
 
-          {/* Save Button */}
-          {isEditing && (
-            <Box sx={{ mt: 4, display: 'flex', gap: 2 }}>
-              <Button
-                variant="contained"
-                startIcon={<Save />}
-                onClick={handleSave}
-                disabled={isLoading}
-              >
-                {isLoading ? <CircularProgress size={20} /> : 'Save Changes'}
-              </Button>
-              <Button
-                variant="outlined"
-                onClick={handleCancel}
-                disabled={isLoading}
-              >
-                Cancel
-              </Button>
+                          <FormControl>
+                            <FormLabel>State/Province</FormLabel>
+                            <Input
+                              name="state"
+                              value={formData.state}
+                              onChange={handleInputChange}
+                              isDisabled={!isEditing}
+                            />
+                          </FormControl>
+
+                          <FormControl>
+                            <FormLabel>ZIP/Postal Code</FormLabel>
+                            <Input
+                              name="zip_code"
+                              value={formData.zip_code}
+                              onChange={handleInputChange}
+                              isDisabled={!isEditing}
+                            />
+                          </FormControl>
+                        </SimpleGrid>
+
+                        <FormControl>
+                          <FormLabel>Country</FormLabel>
+                          <Input
+                            name="country"
+                            value={formData.country}
+                            onChange={handleInputChange}
+                            isDisabled={!isEditing}
+                          />
+                        </FormControl>
+                      </VStack>
+
+                      {/* Action Buttons */}
+                      {isEditing && (
+                        <VStack spacing={4}>
+                          <HStack spacing={4} w="full">
+                            <Button
+                              type="submit"
+                              colorScheme="brand"
+                              flex={1}
+                              isLoading={updateProfileMutation.isPending}
+                              loadingText="Saving..."
+                            >
+                              Save Changes
+                            </Button>
+                            <Button
+                              variant="outline"
+                              onClick={handleCancel}
+                              flex={1}
+                            >
+                              Cancel
+                            </Button>
+                          </HStack>
+                        </VStack>
+                      )}
+                    </VStack>
+                  </form>
+                </CardBody>
+              </Card>
             </Box>
-          )}
-
-          {/* Account Statistics */}
-          <Divider sx={{ my: 4 }} />
-          
-          <Typography variant="h6" gutterBottom>
-            Account Statistics
-          </Typography>
-          
-          <Grid container spacing={3}>
-            <Grid item xs={12} sm={4}>
-              <Paper sx={{ p: 2, textAlign: 'center' }}>
-                <Typography variant="h4" color="primary">
-                  {user.average_rating.toFixed(1)}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Average Rating
-                </Typography>
-              </Paper>
-            </Grid>
-            
-            <Grid item xs={12} sm={4}>
-              <Paper sx={{ p: 2, textAlign: 'center' }}>
-                <Typography variant="h4" color="primary">
-                  {user.total_ratings}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Total Reviews
-                </Typography>
-              </Paper>
-            </Grid>
-            
-            <Grid item xs={12} sm={4}>
-              <Paper sx={{ p: 2, textAlign: 'center' }}>
-                <Typography variant="h4" color="primary">
-                  {new Date(user.created_at).getFullYear()}
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Member Since
-                </Typography>
-              </Paper>
-            </Grid>
-          </Grid>
-        </Paper>
-      </Box>
-    </Container>
+          </SimpleGrid>
+        </VStack>
+      </Container>
+    </Box>
   );
 };
 

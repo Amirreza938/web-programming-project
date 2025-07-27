@@ -2,37 +2,40 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   Box,
   Container,
-  Grid,
-  Paper,
-  Typography,
-  List,
-  ListItem,
-  ListItemAvatar,
-  ListItemText,
-  Avatar,
-  TextField,
+  Heading,
+  Text,
   Button,
-  Divider,
+  Input,
+  VStack,
+  HStack,
+  Card,
+  CardBody,
+  Avatar,
   Badge,
+  Divider,
+  useToast,
+  SimpleGrid,
+  useColorModeValue,
+  Flex,
   IconButton,
-  Chip,
-  CircularProgress,
-  Alert,
-} from '@mui/material';
-import {
-  Send,
-  Person,
-  ArrowBack,
-} from '@mui/icons-material';
+  Textarea,
+  InputGroup,
+  InputLeftElement,
+} from '@chakra-ui/react';
+import { ArrowForwardIcon, SearchIcon } from '@chakra-ui/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiService } from '../services/api';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 
 const ChatPage: React.FC = () => {
+  const toast = useToast();
+  const queryClient = useQueryClient();
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const cardBg = useColorModeValue('white', 'gray.700');
+  
   const [selectedConversation, setSelectedConversation] = useState<number | null>(null);
   const [message, setMessage] = useState('');
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const queryClient = useQueryClient();
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Fetch conversations
   const { data: conversations, isLoading: conversationsLoading } = useQuery({
@@ -45,18 +48,25 @@ const ChatPage: React.FC = () => {
     queryKey: ['messages', selectedConversation],
     queryFn: () => apiService.getMessages(selectedConversation!),
     enabled: !!selectedConversation,
-    refetchInterval: 5000, // Poll every 5 seconds
   });
 
   // Send message mutation
   const sendMessageMutation = useMutation({
-    mutationFn: async (messageData: { conversation: number; content: string }) => {
-      return await apiService.sendMessage(messageData);
-    },
+    mutationFn: (data: { conversationId: number; message: string }) =>
+      apiService.sendMessage(data.conversationId, data.message),
     onSuccess: () => {
       setMessage('');
-      queryClient.invalidateQueries(['messages', selectedConversation]);
-      queryClient.invalidateQueries(['conversations']);
+      queryClient.invalidateQueries({ queryKey: ['messages', selectedConversation] });
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+    },
+    onError: () => {
+      toast({
+        title: 'Error sending message',
+        description: 'Please try again.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
     },
   });
 
@@ -68,230 +78,243 @@ const ChatPage: React.FC = () => {
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim() || !selectedConversation) return;
-
+    
     sendMessageMutation.mutate({
-      conversation: selectedConversation,
-      content: message.trim(),
+      conversationId: selectedConversation,
+      message: message.trim(),
     });
   };
 
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
+  const filteredConversations = conversations?.filter((conv: any) =>
+    conv.product_title?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    conv.other_user_name?.toLowerCase().includes(searchQuery.toLowerCase())
+  ) || [];
 
-    if (diffInHours < 24) {
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-    } else if (diffInHours < 48) {
-      return 'Yesterday';
-    } else {
-      return date.toLocaleDateString();
-    }
-  };
-
-  const selectedConversationData = conversations?.find(c => c.id === selectedConversation);
+  const currentConversation = conversations?.find((conv: any) => conv.id === selectedConversation);
 
   if (conversationsLoading) {
     return <LoadingSpinner />;
   }
 
   return (
-    <Container maxWidth="lg">
-      <Box sx={{ py: 3 }}>
-        <Typography variant="h4" gutterBottom>
-          Messages
-        </Typography>
+    <Box minH="100vh" bg="gray.50" py={8}>
+      <Container maxW="1200px">
+        <VStack spacing={6} align="stretch">
+          <Heading as="h1" size="xl" color="brand.500">
+            Messages
+          </Heading>
 
-        <Grid container spacing={3} sx={{ height: '70vh' }}>
-          {/* Conversations List */}
-          <Grid item xs={12} md={4}>
-            <Paper sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-              <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-                <Typography variant="h6">
-                  Conversations ({conversations?.length || 0})
-                </Typography>
-              </Box>
-              
-              <Box sx={{ flexGrow: 1, overflow: 'auto' }}>
-                {conversations && conversations.length > 0 ? (
-                  <List>
-                    {conversations.map((conversation, index) => (
-                      <React.Fragment key={conversation.id}>
-                        <ListItem
-                          button
-                          selected={selectedConversation === conversation.id}
-                          onClick={() => setSelectedConversation(conversation.id)}
-                          sx={{
-                            '&:hover': {
-                              bgcolor: 'action.hover',
-                            },
-                          }}
-                        >
-                          <ListItemAvatar>
-                            <Badge
-                              badgeContent={conversation.unread_count}
-                              color="error"
-                              invisible={conversation.unread_count === 0}
-                            >
-                              <Avatar>
-                                <Person />
-                              </Avatar>
-                            </Badge>
-                          </ListItemAvatar>
-                          <ListItemText
-                            primary={conversation.other_user.username}
-                            secondary={
-                              <Box>
-                                <Typography variant="body2" noWrap>
-                                  {conversation.last_message?.content || 'No messages yet'}
-                                </Typography>
-                                {conversation.last_message && (
-                                  <Typography variant="caption" color="text.secondary">
-                                    {formatTime(conversation.last_message.created_at)}
-                                  </Typography>
-                                )}
-                              </Box>
-                            }
-                          />
-                        </ListItem>
-                        {index < conversations.length - 1 && <Divider />}
-                      </React.Fragment>
-                    ))}
-                  </List>
-                ) : (
-                  <Box sx={{ p: 3, textAlign: 'center' }}>
-                    <Typography variant="body2" color="text.secondary">
-                      No conversations yet
-                    </Typography>
-                  </Box>
-                )}
-              </Box>
-            </Paper>
-          </Grid>
+          <SimpleGrid columns={{ base: 1, lg: 3 }} gap={6} minH="600px">
+            {/* Conversations List */}
+            <Box gridColumn={{ lg: 'span 1' }}>
+              <Card bg={cardBg} shadow="md" h="full">
+                <CardBody p={4}>
+                  <VStack spacing={4} align="stretch" h="full">
+                    <Heading as="h2" size="md">
+                      Conversations
+                    </Heading>
 
-          {/* Messages Area */}
-          <Grid item xs={12} md={8}>
-            <Paper sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-              {selectedConversation ? (
-                <>
-                  {/* Conversation Header */}
-                  <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                      <IconButton
-                        onClick={() => setSelectedConversation(null)}
-                        sx={{ display: { md: 'none' } }}
-                      >
-                        <ArrowBack />
-                      </IconButton>
-                      <Avatar>
-                        <Person />
-                      </Avatar>
-                      <Box sx={{ flexGrow: 1 }}>
-                        <Typography variant="h6">
-                          {selectedConversationData?.other_user.username}
-                        </Typography>
-                        <Typography variant="body2" color="text.secondary">
-                          {selectedConversationData?.product.title}
-                        </Typography>
-                      </Box>
-                      <Chip
-                        label={`$${selectedConversationData?.product.price}`}
-                        color="primary"
-                        size="small"
-                      />
+                    {/* Search */}
+                    <Box>
+                      <InputGroup>
+                        <InputLeftElement>
+                          <SearchIcon color="gray.400" />
+                        </InputLeftElement>
+                        <Input
+                          placeholder="Search conversations..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                        />
+                      </InputGroup>
                     </Box>
-                  </Box>
 
-                  {/* Messages */}
-                  <Box sx={{ flexGrow: 1, overflow: 'auto', p: 2 }}>
-                    {messagesLoading ? (
-                      <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                        <CircularProgress />
-                      </Box>
-                    ) : messages && messages.length > 0 ? (
-                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-                        {messages.map((msg) => (
-                          <Box
-                            key={msg.id}
-                            sx={{
-                              display: 'flex',
-                              justifyContent: msg.sender === selectedConversationData?.other_user.id ? 'flex-start' : 'flex-end',
-                            }}
+                    <Divider />
+
+                    {/* Conversations */}
+                    <VStack spacing={2} align="stretch" flex={1} overflowY="auto">
+                      {filteredConversations.length > 0 ? (
+                        filteredConversations.map((conversation: any) => (
+                          <Card
+                            key={conversation.id}
+                            cursor="pointer"
+                            bg={selectedConversation === conversation.id ? 'brand.50' : 'transparent'}
+                            border={selectedConversation === conversation.id ? '2px solid' : '1px solid'}
+                            borderColor={selectedConversation === conversation.id ? 'brand.500' : 'gray.200'}
+                            _hover={{ bg: 'gray.50' }}
+                            onClick={() => setSelectedConversation(conversation.id)}
                           >
-                            <Box
-                              sx={{
-                                maxWidth: '70%',
-                                bgcolor: msg.sender === selectedConversationData?.other_user.id ? 'grey.100' : 'primary.main',
-                                color: msg.sender === selectedConversationData?.other_user.id ? 'text.primary' : 'white',
-                                p: 2,
-                                borderRadius: 2,
-                                wordBreak: 'break-word',
-                              }}
+                            <CardBody p={3}>
+                              <VStack align="start" spacing={2}>
+                                <HStack spacing={3} w="full">
+                                  <Avatar
+                                    size="sm"
+                                    name={conversation.other_user_name}
+                                    src={conversation.other_user_image}
+                                  />
+                                  <VStack align="start" spacing={1} flex={1}>
+                                    <Text fontWeight="semibold" fontSize="sm">
+                                      {conversation.other_user_name}
+                                    </Text>
+                                    <Text fontSize="xs" color="gray.600" noOfLines={1}>
+                                      {conversation.last_message}
+                                    </Text>
+                                  </VStack>
+                                  {conversation.unread_count > 0 && (
+                                    <Badge colorScheme="red" variant="solid" size="sm">
+                                      {conversation.unread_count}
+                                    </Badge>
+                                  )}
+                                </HStack>
+                                
+                                <Text fontSize="xs" color="gray.500" noOfLines={1}>
+                                  {conversation.product_title}
+                                </Text>
+                                
+                                <Text fontSize="xs" color="gray.500">
+                                  {new Date(conversation.updated_at).toLocaleDateString()}
+                                </Text>
+                              </VStack>
+                            </CardBody>
+                          </Card>
+                        ))
+                      ) : (
+                        <VStack spacing={4} py={8}>
+                          <Text color="gray.600" textAlign="center">
+                            {searchQuery ? 'No conversations found' : 'No conversations yet'}
+                          </Text>
+                          {!searchQuery && (
+                            <Button
+                              colorScheme="brand"
+                              onClick={() => window.location.href = '/products'}
                             >
-                              <Typography variant="body1">
-                                {msg.content}
-                              </Typography>
-                              <Typography variant="caption" sx={{ opacity: 0.7, mt: 1, display: 'block' }}>
-                                {formatTime(msg.created_at)}
-                              </Typography>
-                            </Box>
-                          </Box>
-                        ))}
-                        <div ref={messagesEndRef} />
-                      </Box>
-                    ) : (
-                      <Box sx={{ textAlign: 'center', py: 4 }}>
-                        <Typography variant="body2" color="text.secondary">
-                          No messages yet. Start the conversation!
-                        </Typography>
-                      </Box>
-                    )}
-                  </Box>
+                              Browse Products
+                            </Button>
+                          )}
+                        </VStack>
+                      )}
+                    </VStack>
+                  </VStack>
+                </CardBody>
+              </Card>
+            </Box>
 
-                  {/* Message Input */}
-                  <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider' }}>
-                    <Box component="form" onSubmit={handleSendMessage} sx={{ display: 'flex', gap: 1 }}>
-                      <TextField
-                        fullWidth
-                        placeholder="Type a message..."
-                        value={message}
-                        onChange={(e) => setMessage(e.target.value)}
-                        disabled={sendMessageMutation.isLoading}
-                        multiline
-                        maxRows={3}
-                      />
-                      <Button
-                        type="submit"
-                        variant="contained"
-                        disabled={!message.trim() || sendMessageMutation.isLoading}
-                        sx={{ minWidth: 'auto', px: 2 }}
-                      >
-                        {sendMessageMutation.isLoading ? (
-                          <CircularProgress size={20} />
+            {/* Chat Area */}
+            <Box gridColumn={{ lg: 'span 2' }}>
+              <Card bg={cardBg} shadow="md" h="full">
+                <CardBody p={0} display="flex" flexDirection="column">
+                  {selectedConversation ? (
+                    <>
+                      {/* Chat Header */}
+                      <Box p={4} borderBottom="1px" borderColor="gray.200">
+                        <HStack spacing={3}>
+                          <Avatar
+                            size="sm"
+                            name={currentConversation?.other_user_name}
+                            src={currentConversation?.other_user_image}
+                          />
+                          <VStack align="start" spacing={1} flex={1}>
+                            <Text fontWeight="semibold">
+                              {currentConversation?.other_user_name}
+                            </Text>
+                            <Text fontSize="sm" color="gray.600">
+                              {currentConversation?.product_title}
+                            </Text>
+                          </VStack>
+                          <Badge colorScheme="blue" variant="outline">
+                            ${currentConversation?.product_price}
+                          </Badge>
+                        </HStack>
+                      </Box>
+
+                      {/* Messages */}
+                      <Box flex={1} p={4} overflowY="auto" maxH="400px">
+                        {messagesLoading ? (
+                          <LoadingSpinner />
                         ) : (
-                          <Send />
+                          <VStack spacing={4} align="stretch">
+                            {messages && messages.length > 0 ? (
+                              messages.map((msg: any) => (
+                                <Box
+                                  key={msg.id}
+                                  alignSelf={msg.is_sender ? 'flex-end' : 'flex-start'}
+                                  maxW="70%"
+                                >
+                                  <Card
+                                    bg={msg.is_sender ? 'brand.500' : 'gray.100'}
+                                    color={msg.is_sender ? 'white' : 'black'}
+                                  >
+                                    <CardBody p={3}>
+                                      <VStack align="start" spacing={1}>
+                                        <Text fontSize="sm">
+                                          {msg.content}
+                                        </Text>
+                                        <Text fontSize="xs" opacity={0.7}>
+                                          {new Date(msg.created_at).toLocaleTimeString()}
+                                        </Text>
+                                      </VStack>
+                                    </CardBody>
+                                  </Card>
+                                </Box>
+                              ))
+                            ) : (
+                              <VStack spacing={4} py={8}>
+                                <Text color="gray.600" textAlign="center">
+                                  No messages yet
+                                </Text>
+                                <Text fontSize="sm" color="gray.500" textAlign="center">
+                                  Start the conversation by sending a message
+                                </Text>
+                              </VStack>
+                            )}
+                            <div ref={messagesEndRef} />
+                          </VStack>
                         )}
+                      </Box>
+
+                      {/* Message Input */}
+                      <Box p={4} borderTop="1px" borderColor="gray.200">
+                        <form onSubmit={handleSendMessage}>
+                          <HStack spacing={3}>
+                            <Textarea
+                              value={message}
+                              onChange={(e) => setMessage(e.target.value)}
+                              placeholder="Type your message..."
+                              rows={1}
+                              resize="none"
+                              flex={1}
+                            />
+                            <IconButton
+                              type="submit"
+                              aria-label="Send message"
+                              icon={<ArrowForwardIcon />}
+                              colorScheme="brand"
+                              isLoading={sendMessageMutation.isPending}
+                              isDisabled={!message.trim()}
+                            />
+                          </HStack>
+                        </form>
+                      </Box>
+                    </>
+                  ) : (
+                    <VStack spacing={4} py={12} justify="center" h="full">
+                      <Text color="gray.600" textAlign="center">
+                        Select a conversation to start messaging
+                      </Text>
+                      <Button
+                        colorScheme="brand"
+                        onClick={() => window.location.href = '/products'}
+                      >
+                        Browse Products
                       </Button>
-                    </Box>
-                  </Box>
-                </>
-              ) : (
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}>
-                  <Box sx={{ textAlign: 'center' }}>
-                    <Typography variant="h6" color="text.secondary" gutterBottom>
-                      Select a conversation
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      Choose a conversation from the list to start messaging
-                    </Typography>
-                  </Box>
-                </Box>
-              )}
-            </Paper>
-          </Grid>
-        </Grid>
-      </Box>
-    </Container>
+                    </VStack>
+                  )}
+                </CardBody>
+              </Card>
+            </Box>
+          </SimpleGrid>
+        </VStack>
+      </Container>
+    </Box>
   );
 };
 

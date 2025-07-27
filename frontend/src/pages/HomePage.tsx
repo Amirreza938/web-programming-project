@@ -2,24 +2,28 @@ import React from 'react';
 import {
   Box,
   Container,
-  Typography,
+  Heading,
+  Text,
   Button,
-  Grid,
+  SimpleGrid,
   Card,
-  CardContent,
-  CardMedia,
-  Chip,
-  Paper,
+  CardBody,
+  CardHeader,
+  Image,
+  Badge,
+  Flex,
   Stack,
-} from '@mui/material';
+  useColorModeValue,
+  VStack,
+  HStack,
+  Icon,
+} from '@chakra-ui/react';
 import {
-  Search,
-  TrendingUp,
-  LocalOffer,
-  Security,
-  Support,
-  ArrowForward,
-} from '@mui/icons-material';
+  SearchIcon,
+  ChatIcon,
+  StarIcon,
+  ArrowForwardIcon,
+} from '@chakra-ui/icons';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { apiService } from '../services/api';
@@ -27,6 +31,8 @@ import LoadingSpinner from '../components/common/LoadingSpinner';
 
 const HomePage: React.FC = () => {
   const navigate = useNavigate();
+  const bg = useColorModeValue('white', 'gray.800');
+  const cardBg = useColorModeValue('white', 'gray.700');
 
   // Fetch featured and popular products
   const { data: featuredProducts, isLoading: featuredLoading } = useQuery({
@@ -46,24 +52,24 @@ const HomePage: React.FC = () => {
 
   const features = [
     {
-      icon: <Search fontSize="large" />,
+      icon: SearchIcon,
       title: 'Easy Search',
-      description: 'Find exactly what you\'re looking for with our advanced search and filtering options.',
+      description: 'Find exactly what you need with our advanced search and filtering system.',
     },
     {
-      icon: <Security fontSize="large" />,
+      icon: ChatIcon,
+      title: 'Direct Communication',
+      description: 'Chat directly with sellers to negotiate prices and ask questions.',
+    },
+    {
+      icon: StarIcon,
+      title: 'Verified Sellers',
+      description: 'Buy from trusted, verified sellers with ratings and reviews.',
+    },
+    {
+      icon: ArrowForwardIcon,
       title: 'Secure Transactions',
-      description: 'Safe and secure platform with verified sellers and buyer protection.',
-    },
-    {
-      icon: <LocalOffer fontSize="large" />,
-      title: 'Best Deals',
-      description: 'Negotiate prices and find the best deals on quality second-hand items.',
-    },
-    {
-      icon: <Support fontSize="large" />,
-      title: '24/7 Support',
-      description: 'Get help whenever you need it with our dedicated customer support team.',
+      description: 'Safe and secure payment processing with buyer and seller protection.',
     },
   ];
 
@@ -74,281 +80,296 @@ const HomePage: React.FC = () => {
   return (
     <Box>
       {/* Hero Section */}
-      <Paper
-        sx={{
-          position: 'relative',
-          backgroundColor: 'grey.800',
-          color: 'white',
-          mb: 4,
-          backgroundSize: 'cover',
-          backgroundRepeat: 'no-repeat',
-          backgroundPosition: 'center',
-          backgroundImage: 'url(https://images.unsplash.com/photo-1441986300917-64674bd600d8?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2070&q=80)',
-        }}
+      <Box
+        bg="linear-gradient(135deg, brand.500 0%, brand.600 100%)"
+        color="white"
+        py={20}
       >
-        <Box
-          sx={{
-            position: 'absolute',
-            top: 0,
-            bottom: 0,
-            right: 0,
-            left: 0,
-            backgroundColor: 'rgba(0,0,0,.3)',
-          }}
-        />
-        <Grid container>
-          <Grid item md={6}>
-            <Box
-              sx={{
-                position: 'relative',
-                p: { xs: 3, md: 6 },
-                pr: { md: 0 },
-              }}
-            >
-              <Typography variant="h2" color="inherit" gutterBottom>
-                Buy & Sell Second-Hand Items
-              </Typography>
-              <Typography variant="h5" color="inherit" paragraph>
-                Join thousands of users buying and selling quality second-hand items in your local community.
-                Save money, reduce waste, and find unique treasures.
-              </Typography>
-              <Stack direction="row" spacing={2} sx={{ mt: 4 }}>
-                <Button
-                  variant="contained"
-                  size="large"
-                  onClick={() => navigate('/products')}
-                  sx={{ px: 4, py: 1.5 }}
-                >
-                  Browse Products
-                </Button>
-                <Button
-                  variant="outlined"
-                  size="large"
-                  onClick={() => navigate('/register')}
-                  sx={{ px: 4, py: 1.5, color: 'white', borderColor: 'white' }}
-                >
-                  Start Selling
-                </Button>
-              </Stack>
-            </Box>
-          </Grid>
-        </Grid>
-      </Paper>
+        <Container maxW="1200px">
+          <VStack spacing={8} textAlign="center">
+            <Heading as="h1" size="2xl" fontWeight="bold">
+              Buy and Sell Second-Hand Items
+            </Heading>
+            <Text fontSize="xl" maxW="600px">
+              Connect with local buyers and sellers. Find great deals on quality items 
+              or sell your unused belongings for cash.
+            </Text>
+            <HStack spacing={4}>
+              <Button
+                size="lg"
+                bg="white"
+                color="brand.500"
+                _hover={{ bg: 'gray.100' }}
+                onClick={() => navigate('/products')}
+              >
+                Browse Products
+              </Button>
+              <Button
+                size="lg"
+                variant="outline"
+                borderColor="white"
+                color="white"
+                _hover={{ bg: 'whiteAlpha.200' }}
+                onClick={() => navigate('/create-product')}
+              >
+                Sell Your Items
+              </Button>
+            </HStack>
+          </VStack>
+        </Container>
+      </Box>
 
-      <Container maxWidth="lg">
-        {/* Features Section */}
-        <Box sx={{ py: 8 }}>
-          <Typography variant="h3" component="h2" align="center" gutterBottom>
-            Why Choose SecondHand Market?
-          </Typography>
-          <Typography variant="h6" align="center" color="text.secondary" paragraph>
-            We provide the best platform for buying and selling second-hand items
-          </Typography>
-          <Grid container spacing={4} sx={{ mt: 4 }}>
-            {features.map((feature, index) => (
-              <Grid item xs={12} sm={6} md={3} key={index}>
-                <Box
-                  sx={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    textAlign: 'center',
-                    p: 3,
-                  }}
-                >
-                  <Box sx={{ color: 'primary.main', mb: 2 }}>
-                    {feature.icon}
+      {/* Features Section */}
+      <Box py={16} bg="gray.50">
+        <Container maxW="1200px">
+          <VStack spacing={12}>
+            <VStack spacing={4} textAlign="center">
+              <Heading as="h2" size="xl">
+                Why Choose SecondHand?
+              </Heading>
+              <Text fontSize="lg" color="gray.600" maxW="600px">
+                Our platform makes buying and selling second-hand items simple, 
+                secure, and enjoyable.
+              </Text>
+            </VStack>
+
+            <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} gap={8}>
+              {features.map((feature, index) => (
+                <VStack key={index} spacing={4} textAlign="center">
+                  <Box
+                    p={4}
+                    bg="brand.500"
+                    color="white"
+                    borderRadius="full"
+                    fontSize="2xl"
+                  >
+                    <Icon as={feature.icon} />
                   </Box>
-                  <Typography variant="h6" gutterBottom>
-                    {feature.title}
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    {feature.description}
-                  </Typography>
-                </Box>
-              </Grid>
-            ))}
-          </Grid>
-        </Box>
+                  <VStack spacing={2}>
+                    <Heading as="h3" size="md">
+                      {feature.title}
+                    </Heading>
+                    <Text color="gray.600" fontSize="sm">
+                      {feature.description}
+                    </Text>
+                  </VStack>
+                </VStack>
+              ))}
+            </SimpleGrid>
+          </VStack>
+        </Container>
+      </Box>
 
-        {/* Featured Products Section */}
-        {featuredProducts && featuredProducts.length > 0 && (
-          <Box sx={{ py: 8 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-              <Typography variant="h4" component="h2">
+      {/* Featured Products */}
+      <Box py={16}>
+        <Container maxW="1200px">
+          <VStack spacing={8}>
+            <Flex justify="space-between" align="center" w="full">
+              <Heading as="h2" size="xl">
                 Featured Products
-              </Typography>
+              </Heading>
               <Button
-                endIcon={<ArrowForward />}
-                onClick={() => navigate('/products')}
+                rightIcon={<ArrowForwardIcon />}
+                variant="ghost"
+                colorScheme="brand"
+                onClick={() => navigate('/products?featured=true')}
               >
                 View All
               </Button>
-            </Box>
-            <Grid container spacing={3}>
-              {featuredProducts.slice(0, 4).map((product) => (
-                <Grid item xs={12} sm={6} md={3} key={product.id}>
-                  <Card
-                    sx={{ height: '100%', cursor: 'pointer' }}
-                    onClick={() => navigate(`/products/${product.id}`)}
-                  >
-                    <CardMedia
-                      component="img"
-                      height="200"
-                      image={product.main_image || 'https://via.placeholder.com/300x200?text=No+Image'}
-                      alt={product.title}
-                    />
-                    <CardContent>
-                      <Typography variant="h6" noWrap>
-                        {product.title}
-                      </Typography>
-                      <Typography variant="h6" color="primary" sx={{ fontWeight: 'bold' }}>
-                        ${product.price}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" noWrap>
-                        {product.location}
-                      </Typography>
-                      <Box sx={{ mt: 1 }}>
-                        <Chip
-                          label={product.condition}
-                          size="small"
-                          color="secondary"
-                          variant="outlined"
-                        />
-                      </Box>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              ))}
-            </Grid>
-          </Box>
-        )}
+            </Flex>
 
-        {/* Popular Products Section */}
-        {popularProducts && popularProducts.length > 0 && (
-          <Box sx={{ py: 8 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
-              <Typography variant="h4" component="h2">
-                <TrendingUp sx={{ mr: 1, verticalAlign: 'middle' }} />
-                Popular Products
-              </Typography>
-              <Button
-                endIcon={<ArrowForward />}
-                onClick={() => navigate('/products')}
-              >
-                View All
-              </Button>
-            </Box>
-            <Grid container spacing={3}>
-              {popularProducts.slice(0, 4).map((product) => (
-                <Grid item xs={12} sm={6} md={3} key={product.id}>
-                  <Card
-                    sx={{ height: '100%', cursor: 'pointer' }}
-                    onClick={() => navigate(`/products/${product.id}`)}
-                  >
-                    <CardMedia
-                      component="img"
-                      height="200"
-                      image={product.main_image || 'https://via.placeholder.com/300x200?text=No+Image'}
-                      alt={product.title}
-                    />
-                    <CardContent>
-                      <Typography variant="h6" noWrap>
+            <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} gap={6}>
+              {featuredProducts?.results?.slice(0, 4).map((product: any) => (
+                <Card
+                  key={product.id}
+                  bg={cardBg}
+                  shadow="md"
+                  _hover={{ shadow: 'lg', transform: 'translateY(-2px)' }}
+                  transition="all 0.2s"
+                  cursor="pointer"
+                  onClick={() => navigate(`/products/${product.id}`)}
+                >
+                  <Image
+                    src={product.main_image || 'https://via.placeholder.com/300x200?text=No+Image'}
+                    alt={product.title}
+                    height="200px"
+                    objectFit="cover"
+                  />
+                  <CardBody>
+                    <VStack align="start" spacing={3}>
+                      <Heading as="h3" size="md" noOfLines={2}>
                         {product.title}
-                      </Typography>
-                      <Typography variant="h6" color="primary" sx={{ fontWeight: 'bold' }}>
+                      </Heading>
+                      <Text fontSize="xl" fontWeight="bold" color="brand.500">
                         ${product.price}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary" noWrap>
+                      </Text>
+                      <HStack spacing={2}>
+                        <Badge colorScheme="blue" variant="outline">
+                          {product.condition}
+                        </Badge>
+                        {product.is_negotiable && (
+                          <Badge colorScheme="green" variant="outline">
+                            Negotiable
+                          </Badge>
+                        )}
+                      </HStack>
+                      <Text fontSize="sm" color="gray.600" noOfLines={2}>
                         {product.location}
-                      </Typography>
-                      <Box sx={{ mt: 1, display: 'flex', gap: 1 }}>
-                        <Chip
-                          label={product.condition}
-                          size="small"
-                          color="secondary"
-                          variant="outlined"
-                        />
-                        <Chip
-                          label={`${product.views_count} views`}
-                          size="small"
-                          variant="outlined"
-                        />
-                      </Box>
-                    </CardContent>
-                  </Card>
-                </Grid>
+                      </Text>
+                    </VStack>
+                  </CardBody>
+                </Card>
               ))}
-            </Grid>
-          </Box>
-        )}
+            </SimpleGrid>
+          </VStack>
+        </Container>
+      </Box>
 
-        {/* Categories Section */}
-        {categories && categories.length > 0 && (
-          <Box sx={{ py: 8 }}>
-            <Typography variant="h4" component="h2" align="center" gutterBottom>
-              Browse by Category
-            </Typography>
-            <Grid container spacing={3}>
-              {categories.slice(0, 8).map((category) => (
-                <Grid item xs={6} sm={4} md={3} key={category.id}>
-                  <Card
-                    sx={{
-                      height: '100%',
-                      cursor: 'pointer',
-                      textAlign: 'center',
-                      '&:hover': {
-                        transform: 'translateY(-4px)',
-                        transition: 'transform 0.2s',
-                      },
-                    }}
-                    onClick={() => navigate(`/products?category=${category.id}`)}
-                  >
-                    <CardContent>
-                      <Typography variant="h6" gutterBottom>
+      {/* Popular Categories */}
+      <Box py={16} bg="gray.50">
+        <Container maxW="1200px">
+          <VStack spacing={8}>
+            <VStack spacing={4} textAlign="center">
+              <Heading as="h2" size="xl">
+                Popular Categories
+              </Heading>
+              <Text fontSize="lg" color="gray.600">
+                Explore items by category
+              </Text>
+            </VStack>
+
+            <SimpleGrid columns={{ base: 2, md: 3, lg: 4 }} gap={6}>
+              {categories?.slice(0, 8).map((category: any) => (
+                <Card
+                  key={category.id}
+                  bg={cardBg}
+                  shadow="md"
+                  _hover={{ shadow: 'lg', transform: 'translateY(-2px)' }}
+                  transition="all 0.2s"
+                  cursor="pointer"
+                  onClick={() => navigate(`/products?category=${category.id}`)}
+                >
+                  <CardBody textAlign="center">
+                    <VStack spacing={3}>
+                      <Text fontSize="lg" fontWeight="semibold">
                         {category.name}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {category.products_count} products
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
+                      </Text>
+                      <Text fontSize="sm" color="gray.600">
+                        {category.product_count || 0} items
+                      </Text>
+                    </VStack>
+                  </CardBody>
+                </Card>
               ))}
-            </Grid>
-          </Box>
-        )}
+            </SimpleGrid>
+          </VStack>
+        </Container>
+      </Box>
 
-        {/* Call to Action */}
-        <Box sx={{ py: 8, textAlign: 'center' }}>
-          <Paper sx={{ p: 6, bgcolor: 'primary.main', color: 'white' }}>
-            <Typography variant="h4" gutterBottom>
-              Ready to Start Buying and Selling?
-            </Typography>
-            <Typography variant="h6" paragraph>
-              Join our community today and discover amazing deals on quality second-hand items.
-            </Typography>
-            <Stack direction="row" spacing={2} justifyContent="center" sx={{ mt: 4 }}>
+      {/* Popular Products */}
+      <Box py={16}>
+        <Container maxW="1200px">
+          <VStack spacing={8}>
+            <Flex justify="space-between" align="center" w="full">
+              <Heading as="h2" size="xl">
+                Most Popular
+              </Heading>
               <Button
-                variant="contained"
-                size="large"
+                rightIcon={<ArrowForwardIcon />}
+                variant="ghost"
+                colorScheme="brand"
+                onClick={() => navigate('/products?sort=popular')}
+              >
+                View All
+              </Button>
+            </Flex>
+
+            <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} gap={6}>
+              {popularProducts?.results?.slice(0, 4).map((product: any) => (
+                <Card
+                  key={product.id}
+                  bg={cardBg}
+                  shadow="md"
+                  _hover={{ shadow: 'lg', transform: 'translateY(-2px)' }}
+                  transition="all 0.2s"
+                  cursor="pointer"
+                  onClick={() => navigate(`/products/${product.id}`)}
+                >
+                  <Image
+                    src={product.main_image || 'https://via.placeholder.com/300x200?text=No+Image'}
+                    alt={product.title}
+                    height="200px"
+                    objectFit="cover"
+                  />
+                  <CardBody>
+                    <VStack align="start" spacing={3}>
+                      <Heading as="h3" size="md" noOfLines={2}>
+                        {product.title}
+                      </Heading>
+                      <Text fontSize="xl" fontWeight="bold" color="brand.500">
+                        ${product.price}
+                      </Text>
+                      <HStack spacing={2}>
+                        <Badge colorScheme="blue" variant="outline">
+                          {product.condition}
+                        </Badge>
+                        {product.is_negotiable && (
+                          <Badge colorScheme="green" variant="outline">
+                            Negotiable
+                          </Badge>
+                        )}
+                      </HStack>
+                      <Text fontSize="sm" color="gray.600" noOfLines={2}>
+                        {product.location}
+                      </Text>
+                    </VStack>
+                  </CardBody>
+                </Card>
+              ))}
+            </SimpleGrid>
+          </VStack>
+        </Container>
+      </Box>
+
+      {/* CTA Section */}
+      <Box
+        bg="linear-gradient(135deg, brand.500 0%, brand.600 100%)"
+        color="white"
+        py={16}
+      >
+        <Container maxW="1200px">
+          <VStack spacing={8} textAlign="center">
+            <Heading as="h2" size="xl">
+              Ready to Start Buying and Selling?
+            </Heading>
+            <Text fontSize="lg" maxW="600px">
+              Join thousands of users who are already buying and selling 
+              second-hand items in their community.
+            </Text>
+            <HStack spacing={4}>
+              <Button
+                size="lg"
+                bg="white"
+                color="brand.500"
+                _hover={{ bg: 'gray.100' }}
                 onClick={() => navigate('/register')}
-                sx={{ px: 4, py: 1.5, bgcolor: 'white', color: 'primary.main' }}
               >
                 Get Started
               </Button>
               <Button
-                variant="outlined"
-                size="large"
+                size="lg"
+                variant="outline"
+                borderColor="white"
+                color="white"
+                _hover={{ bg: 'whiteAlpha.200' }}
                 onClick={() => navigate('/products')}
-                sx={{ px: 4, py: 1.5, color: 'white', borderColor: 'white' }}
               >
                 Browse Now
               </Button>
-            </Stack>
-          </Paper>
-        </Box>
-      </Container>
+            </HStack>
+          </VStack>
+        </Container>
+      </Box>
     </Box>
   );
 };

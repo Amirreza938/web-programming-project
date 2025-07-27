@@ -1,264 +1,378 @@
 import React, { useState } from 'react';
 import {
-  AppBar,
-  Toolbar,
-  Typography,
-  Button,
-  IconButton,
   Box,
-  Avatar,
+  Flex,
+  Text,
+  Button,
+  Input,
+  InputGroup,
+  InputLeftElement,
   Menu,
+  MenuButton,
+  MenuList,
   MenuItem,
+  MenuDivider,
+  Avatar,
   Badge,
-  InputBase,
-  alpha,
-  styled,
-} from '@mui/material';
+  IconButton,
+  useDisclosure,
+  Drawer,
+  DrawerBody,
+  DrawerHeader,
+  DrawerOverlay,
+  DrawerContent,
+  DrawerCloseButton,
+  VStack,
+  HStack,
+  useColorModeValue,
+  Divider,
+} from '@chakra-ui/react';
 import {
-  Search as SearchIcon,
-  ShoppingCart,
-  Favorite,
-  Chat,
-  Person,
-  Logout,
-  Dashboard,
-  Add,
-} from '@mui/icons-material';
-import { useNavigate, useLocation } from 'react-router-dom';
+  SearchIcon,
+  HamburgerIcon,
+  BellIcon,
+  ChatIcon,
+  SettingsIcon,
+} from '@chakra-ui/icons';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
-import { useQuery } from '@tanstack/react-query';
-import { apiService } from '../../services/api';
-
-const Search = styled('div')(({ theme }) => ({
-  position: 'relative',
-  borderRadius: theme.shape.borderRadius,
-  backgroundColor: alpha(theme.palette.common.white, 0.15),
-  '&:hover': {
-    backgroundColor: alpha(theme.palette.common.white, 0.25),
-  },
-  marginRight: theme.spacing(2),
-  marginLeft: 0,
-  width: '100%',
-  [theme.breakpoints.up('sm')]: {
-    marginLeft: theme.spacing(3),
-    width: 'auto',
-  },
-}));
-
-const SearchIconWrapper = styled('div')(({ theme }) => ({
-  padding: theme.spacing(0, 2),
-  height: '100%',
-  position: 'absolute',
-  pointerEvents: 'none',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-}));
-
-const StyledInputBase = styled(InputBase)(({ theme }) => ({
-  color: 'inherit',
-  '& .MuiInputBase-input': {
-    padding: theme.spacing(1, 1, 1, 0),
-    paddingLeft: `calc(1em + ${theme.spacing(4)})`,
-    transition: theme.transitions.create('width'),
-    width: '100%',
-    [theme.breakpoints.up('md')]: {
-      width: '40ch',
-    },
-  },
-}));
 
 const Navbar: React.FC = () => {
   const navigate = useNavigate();
-  const location = useLocation();
   const { user, isAuthenticated, logout } = useAuth();
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  
+  const bg = useColorModeValue('white', 'gray.800');
+  const borderColor = useColorModeValue('gray.200', 'gray.700');
 
-  // Get unread counts for notifications
-  const { data: unreadCounts } = useQuery({
-    queryKey: ['unreadCounts'],
-    queryFn: () => apiService.getUnreadCounts(),
-    enabled: isAuthenticated,
-    refetchInterval: 30000, // Refetch every 30 seconds
-  });
-
-  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
-    setAnchorEl(event.currentTarget);
-  };
-
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-  };
-
-  const handleLogout = async () => {
-    await logout();
-    handleMenuClose();
-    navigate('/');
-  };
-
-  const handleSearch = (event: React.FormEvent) => {
-    event.preventDefault();
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
     if (searchQuery.trim()) {
       navigate(`/products?search=${encodeURIComponent(searchQuery.trim())}`);
     }
   };
 
-  const handleProfileClick = () => {
-    handleMenuClose();
-    navigate('/profile');
+  const handleLogout = () => {
+    logout();
+    navigate('/');
   };
 
-  const handleDashboardClick = () => {
-    handleMenuClose();
-    navigate('/dashboard');
-  };
-
-  const handleCreateProductClick = () => {
-    handleMenuClose();
-    navigate('/create-product');
-  };
+  const NavLink = ({ children, href }: { children: React.ReactNode; href: string }) => (
+    <Button
+      variant="ghost"
+      onClick={() => navigate(href)}
+      _hover={{ bg: 'brand.50' }}
+      color="gray.700"
+    >
+      {children}
+    </Button>
+  );
 
   return (
-    <AppBar position="sticky">
-      <Toolbar>
-        {/* Logo */}
-        <Typography
-          variant="h6"
-          component="div"
-          sx={{ cursor: 'pointer', fontWeight: 'bold' }}
-          onClick={() => navigate('/')}
+    <>
+      <Box
+        as="nav"
+        bg={bg}
+        borderBottom="1px"
+        borderColor={borderColor}
+        position="sticky"
+        top={0}
+        zIndex={1000}
+      >
+        <Flex
+          maxW="1200px"
+          mx="auto"
+          px={4}
+          py={3}
+          align="center"
+          justify="space-between"
         >
-          SecondHand Market
-        </Typography>
+          {/* Logo */}
+          <Flex align="center" cursor="pointer" onClick={() => navigate('/')}>
+            <Text fontSize="2xl" fontWeight="bold" color="brand.500">
+              SecondHand
+            </Text>
+          </Flex>
 
-        {/* Search Bar */}
-        <Box component="form" onSubmit={handleSearch} sx={{ flexGrow: 1, mx: 2 }}>
-          <Search>
-            <SearchIconWrapper>
-              <SearchIcon />
-            </SearchIconWrapper>
-            <StyledInputBase
-              placeholder="Search products..."
-              inputProps={{ 'aria-label': 'search' }}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-            />
-          </Search>
-        </Box>
+          {/* Desktop Navigation */}
+          <Flex align="center" display={{ base: 'none', md: 'flex' }}>
+            <NavLink href="/products">Browse</NavLink>
+            <NavLink href="/categories">Categories</NavLink>
+            {isAuthenticated && (
+              <NavLink href="/create-product">Sell</NavLink>
+            )}
+          </Flex>
 
-        {/* Navigation Links */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Button
-            color="inherit"
-            onClick={() => navigate('/products')}
-            sx={{ display: { xs: 'none', md: 'block' } }}
-          >
-            Browse
-          </Button>
+          {/* Search Bar */}
+          <Box flex={1} maxW="400px" mx={4} display={{ base: 'none', md: 'block' }}>
+            <form onSubmit={handleSearch}>
+              <InputGroup>
+                <InputLeftElement>
+                  <SearchIcon color="gray.400" />
+                </InputLeftElement>
+                <Input
+                  placeholder="Search products..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                />
+              </InputGroup>
+            </form>
+          </Box>
 
-          {isAuthenticated ? (
-            <>
-              {/* Favorites */}
-              <IconButton
-                color="inherit"
-                onClick={() => navigate('/favorites')}
-                sx={{ display: { xs: 'none', sm: 'block' } }}
-              >
-                <Badge badgeContent={0} color="secondary">
-                  <Favorite />
-                </Badge>
-              </IconButton>
+          {/* User Menu */}
+          <Flex align="center" gap={2}>
+            {isAuthenticated ? (
+              <>
+                {/* Notifications */}
+                <IconButton
+                  aria-label="Notifications"
+                  icon={<BellIcon />}
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate('/chat')}
+                />
 
-              {/* Chat */}
-              <IconButton
-                color="inherit"
-                onClick={() => navigate('/chat')}
-                sx={{ display: { xs: 'none', sm: 'block' } }}
-              >
-                <Badge badgeContent={unreadCounts?.unread_messages || 0} color="secondary">
-                  <Chat />
-                </Badge>
-              </IconButton>
+                {/* Messages */}
+                <IconButton
+                  aria-label="Messages"
+                  icon={<ChatIcon />}
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate('/chat')}
+                />
 
-              {/* Orders */}
-              <IconButton
-                color="inherit"
-                onClick={() => navigate('/orders')}
-                sx={{ display: { xs: 'none', sm: 'block' } }}
-              >
-                <Badge badgeContent={0} color="secondary">
-                  <ShoppingCart />
-                </Badge>
-              </IconButton>
-
-              {/* User Menu */}
-              <IconButton
-                onClick={handleMenuOpen}
-                sx={{ ml: 1 }}
-              >
-                <Avatar
-                  sx={{ width: 32, height: 32, bgcolor: 'secondary.main' }}
+                {/* User Menu */}
+                <Menu>
+                  <MenuButton
+                    as={Button}
+                    variant="ghost"
+                    size="sm"
+                    px={2}
+                    py={2}
+                    _hover={{ bg: 'gray.100' }}
+                  >
+                    <HStack spacing={2}>
+                      <Avatar size="sm" name={`${user?.first_name} ${user?.last_name}`} />
+                      <Text fontSize="sm" display={{ base: 'none', lg: 'block' }}>
+                        {user?.first_name}
+                      </Text>
+                    </HStack>
+                  </MenuButton>
+                  <MenuList>
+                    <MenuItem onClick={() => navigate('/profile')}>
+                      Profile
+                    </MenuItem>
+                    <MenuItem onClick={() => navigate('/dashboard')}>
+                      Dashboard
+                    </MenuItem>
+                    <MenuItem onClick={() => navigate('/orders')}>
+                      My Orders
+                    </MenuItem>
+                    <MenuItem onClick={() => navigate('/favorites')}>
+                      Favorites
+                    </MenuItem>
+                    <MenuDivider />
+                    <MenuItem onClick={handleLogout} icon={<SettingsIcon />}>
+                      Logout
+                    </MenuItem>
+                  </MenuList>
+                </Menu>
+              </>
+            ) : (
+              <>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => navigate('/login')}
                 >
-                  {user?.first_name?.[0] || user?.username?.[0] || <Person />}
-                </Avatar>
-              </IconButton>
+                  Login
+                </Button>
+                <Button
+                  colorScheme="brand"
+                  size="sm"
+                  onClick={() => navigate('/register')}
+                >
+                  Sign Up
+                </Button>
+              </>
+            )}
 
-              <Menu
-                anchorEl={anchorEl}
-                open={Boolean(anchorEl)}
-                onClose={handleMenuClose}
-                anchorOrigin={{
-                  vertical: 'bottom',
-                  horizontal: 'right',
-                }}
-                transformOrigin={{
-                  vertical: 'top',
-                  horizontal: 'right',
-                }}
-              >
-                <MenuItem onClick={handleProfileClick}>
-                  <Person sx={{ mr: 1 }} />
-                  Profile
-                </MenuItem>
-                <MenuItem onClick={handleDashboardClick}>
-                  <Dashboard sx={{ mr: 1 }} />
-                  Dashboard
-                </MenuItem>
-                {user?.user_type !== 'buyer' && (
-                  <MenuItem onClick={handleCreateProductClick}>
-                    <Add sx={{ mr: 1 }} />
-                    Create Product
-                  </MenuItem>
+            {/* Mobile Menu Button */}
+            <IconButton
+              aria-label="Open menu"
+              icon={<HamburgerIcon />}
+              variant="ghost"
+              size="sm"
+              display={{ base: 'flex', md: 'none' }}
+              onClick={onOpen}
+            />
+          </Flex>
+        </Flex>
+      </Box>
+
+      {/* Mobile Drawer */}
+      <Drawer isOpen={isOpen} placement="right" onClose={onClose} size="full">
+        <DrawerOverlay />
+        <DrawerContent>
+          <DrawerCloseButton />
+          <DrawerHeader>Menu</DrawerHeader>
+          <DrawerBody>
+            <VStack spacing={4} align="stretch">
+              {/* Mobile Search */}
+              <Box>
+                <form onSubmit={handleSearch}>
+                  <InputGroup>
+                    <InputLeftElement>
+                      <SearchIcon color="gray.400" />
+                    </InputLeftElement>
+                    <Input
+                      placeholder="Search products..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                    />
+                  </InputGroup>
+                </form>
+              </Box>
+
+              {/* Mobile Navigation */}
+              <VStack spacing={2} align="stretch">
+                <Button
+                  variant="ghost"
+                  justifyContent="flex-start"
+                  onClick={() => {
+                    navigate('/products');
+                    onClose();
+                  }}
+                >
+                  Browse Products
+                </Button>
+                <Button
+                  variant="ghost"
+                  justifyContent="flex-start"
+                  onClick={() => {
+                    navigate('/categories');
+                    onClose();
+                  }}
+                >
+                  Categories
+                </Button>
+                {isAuthenticated && (
+                  <Button
+                    variant="ghost"
+                    justifyContent="flex-start"
+                    onClick={() => {
+                      navigate('/create-product');
+                      onClose();
+                    }}
+                  >
+                    Sell Your Items
+                  </Button>
                 )}
-                <MenuItem onClick={handleLogout}>
-                  <Logout sx={{ mr: 1 }} />
-                  Logout
-                </MenuItem>
-              </Menu>
-            </>
-          ) : (
-            <>
-              <Button
-                color="inherit"
-                onClick={() => navigate('/login')}
-                sx={{ display: { xs: 'none', sm: 'block' } }}
-              >
-                Login
-              </Button>
-              <Button
-                variant="contained"
-                color="secondary"
-                onClick={() => navigate('/register')}
-                sx={{ display: { xs: 'none', sm: 'block' } }}
-              >
-                Register
-              </Button>
-            </>
-          )}
-        </Box>
-      </Toolbar>
-    </AppBar>
+              </VStack>
+
+              {isAuthenticated && (
+                <>
+                  <Divider />
+                  <VStack spacing={2} align="stretch">
+                    <Button
+                      variant="ghost"
+                      justifyContent="flex-start"
+                      onClick={() => {
+                        navigate('/profile');
+                        onClose();
+                      }}
+                    >
+                      Profile
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      justifyContent="flex-start"
+                      onClick={() => {
+                        navigate('/dashboard');
+                        onClose();
+                      }}
+                    >
+                      Dashboard
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      justifyContent="flex-start"
+                      onClick={() => {
+                        navigate('/orders');
+                        onClose();
+                      }}
+                    >
+                      My Orders
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      justifyContent="flex-start"
+                      onClick={() => {
+                        navigate('/favorites');
+                        onClose();
+                      }}
+                    >
+                      Favorites
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      justifyContent="flex-start"
+                      onClick={() => {
+                        navigate('/chat');
+                        onClose();
+                      }}
+                    >
+                      Messages
+                    </Button>
+                  </VStack>
+                  <Divider />
+                  <Button
+                    variant="ghost"
+                    justifyContent="flex-start"
+                    colorScheme="red"
+                    leftIcon={<SettingsIcon />}
+                    onClick={() => {
+                      handleLogout();
+                      onClose();
+                    }}
+                  >
+                    Logout
+                  </Button>
+                </>
+              )}
+
+              {!isAuthenticated && (
+                <>
+                  <Divider />
+                  <VStack spacing={2} align="stretch">
+                    <Button
+                      colorScheme="brand"
+                      onClick={() => {
+                        navigate('/login');
+                        onClose();
+                      }}
+                    >
+                      Login
+                    </Button>
+                    <Button
+                      variant="outline"
+                      colorScheme="brand"
+                      onClick={() => {
+                        navigate('/register');
+                        onClose();
+                      }}
+                    >
+                      Sign Up
+                    </Button>
+                  </VStack>
+                </>
+              )}
+            </VStack>
+          </DrawerBody>
+        </DrawerContent>
+      </Drawer>
+    </>
   );
 };
 

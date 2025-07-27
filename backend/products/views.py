@@ -255,6 +255,31 @@ def remove_favorite(request, product_id):
         )
 
 
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def toggle_favorite(request, product_id):
+    """Toggle product in favorites (add if not favorited, remove if favorited)"""
+    try:
+        favorite = Favorite.objects.get(
+            user=request.user, 
+            product_id=product_id
+        )
+        # Product is already favorited, remove it
+        favorite.delete()
+        return Response({'message': 'Product removed from favorites', 'is_favorited': False})
+    except Favorite.DoesNotExist:
+        # Product is not favorited, add it
+        try:
+            product = Product.objects.get(id=product_id)
+            Favorite.objects.create(user=request.user, product=product)
+            return Response({'message': 'Product added to favorites', 'is_favorited': True})
+        except Product.DoesNotExist:
+            return Response(
+                {'error': 'Product not found'}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+
 @api_view(['GET'])
 @permission_classes([permissions.AllowAny])
 def search_products(request):

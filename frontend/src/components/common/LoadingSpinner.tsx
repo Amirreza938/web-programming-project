@@ -1,29 +1,28 @@
 import React from 'react';
-import { Box, CircularProgress, Typography } from '@mui/material';
+import { Box, Spinner, Text, VStack } from '@chakra-ui/react';
 
 interface LoadingSpinnerProps {
   message?: string;
-  size?: number;
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl';
 }
 
 const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({ 
   message = 'Loading...', 
-  size = 40 
+  size = 'md' 
 }) => {
   return (
-    <Box
-      display="flex"
-      flexDirection="column"
-      alignItems="center"
-      justifyContent="center"
-      minHeight="200px"
-      gap={2}
-    >
-      <CircularProgress size={size} />
-      <Typography variant="body2" color="text.secondary">
+    <VStack spacing={4} justify="center" align="center" minH="200px">
+      <Spinner
+        thickness="4px"
+        speed="0.65s"
+        emptyColor="gray.200"
+        color="brand.500"
+        size={size}
+      />
+      <Text color="gray.600" fontSize="md">
         {message}
-      </Typography>
-    </Box>
+      </Text>
+    </VStack>
   );
 };
 

@@ -2,31 +2,32 @@ import React from 'react';
 import {
   Box,
   Container,
-  Typography,
-  Grid,
-  Card,
-  CardContent,
-  CardMedia,
-  Chip,
+  Heading,
+  Text,
   Button,
+  Card,
+  CardBody,
+  Image,
+  Badge,
+  VStack,
+  HStack,
+  SimpleGrid,
+  useToast,
+  useColorModeValue,
   IconButton,
-  Stack,
-} from '@mui/material';
+} from '@chakra-ui/react';
 import {
-  Favorite,
-  LocationOn,
-  Visibility,
-  Chat,
-  LocalOffer,
-} from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
+  ChatIcon,
+  StarIcon,
+} from '@chakra-ui/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiService } from '../services/api';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 
 const FavoritesPage: React.FC = () => {
-  const navigate = useNavigate();
+  const toast = useToast();
   const queryClient = useQueryClient();
+  const cardBg = useColorModeValue('white', 'gray.700');
 
   // Fetch favorites
   const { data: favorites, isLoading } = useQuery({
@@ -36,11 +37,24 @@ const FavoritesPage: React.FC = () => {
 
   // Remove from favorites mutation
   const removeFavoriteMutation = useMutation({
-    mutationFn: async (productId: number) => {
-      await apiService.removeFromFavorites(productId);
-    },
+    mutationFn: (productId: number) => apiService.removeFromFavorites(productId),
     onSuccess: () => {
-      queryClient.invalidateQueries(['favorites']);
+      queryClient.invalidateQueries({ queryKey: ['favorites'] });
+      toast({
+        title: 'Removed from favorites',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Error removing from favorites',
+        description: 'Please try again.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
     },
   });
 
@@ -49,11 +63,8 @@ const FavoritesPage: React.FC = () => {
   };
 
   const handleStartChat = (productId: number) => {
-    navigate(`/products/${productId}`);
-  };
-
-  const handleMakeOffer = (productId: number) => {
-    navigate(`/products/${productId}`);
+    // Navigate to chat with seller
+    window.location.href = `/chat?product=${productId}`;
   };
 
   if (isLoading) {
@@ -61,152 +72,160 @@ const FavoritesPage: React.FC = () => {
   }
 
   return (
-    <Container maxWidth="lg">
-      <Box sx={{ py: 3 }}>
-        <Typography variant="h4" gutterBottom>
-          My Favorites
-        </Typography>
-        <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
-          Your saved items ({favorites?.length || 0})
-        </Typography>
+    <Box minH="100vh" bg="gray.50" py={8}>
+      <Container maxW="1200px">
+        <VStack spacing={8} align="stretch">
+          {/* Header */}
+          <VStack spacing={4} textAlign="center">
+            <Heading as="h1" size="xl" color="brand.500">
+              My Favorites
+            </Heading>
+            <Text color="gray.600">
+              Your saved items and wishlist
+            </Text>
+          </VStack>
 
-        {favorites && favorites.length > 0 ? (
-          <Grid container spacing={3}>
-            {favorites.map((product) => (
-              <Grid item xs={12} sm={6} md={4} lg={3} key={product.id}>
+          {/* Favorites Grid */}
+          {favorites && favorites.length > 0 ? (
+            <SimpleGrid columns={{ base: 1, md: 2, lg: 3, xl: 4 }} gap={6}>
+              {favorites.map((product: any) => (
                 <Card
-                  sx={{
-                    height: '100%',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    '&:hover': {
-                      transform: 'translateY(-4px)',
-                      transition: 'transform 0.2s',
-                    },
-                  }}
+                  key={product.id}
+                  bg={cardBg}
+                  shadow="md"
+                  _hover={{ shadow: 'lg', transform: 'translateY(-2px)' }}
+                  transition="all 0.2s"
                 >
-                  <Box sx={{ position: 'relative' }}>
-                    <CardMedia
-                      component="img"
-                      height="200"
-                      image={product.main_image || 'https://via.placeholder.com/300x200?text=No+Image'}
+                  <Box position="relative">
+                    <Image
+                      src={product.main_image || 'https://via.placeholder.com/300x200?text=No+Image'}
                       alt={product.title}
-                      sx={{ cursor: 'pointer' }}
-                      onClick={() => navigate(`/products/${product.id}`)}
+                      height="200px"
+                      objectFit="cover"
+                      cursor="pointer"
+                      onClick={() => window.location.href = `/products/${product.id}`}
                     />
+                    
+                    {/* Remove from favorites button */}
                     <IconButton
-                      sx={{
-                        position: 'absolute',
-                        top: 8,
-                        right: 8,
-                        bgcolor: 'rgba(255,255,255,0.9)',
-                        '&:hover': {
-                          bgcolor: 'rgba(255,255,255,1)',
-                        },
-                      }}
+                      aria-label="Remove from favorites"
+                      icon={<StarIcon />}
+                      colorScheme="red"
+                      variant="solid"
+                      size="sm"
+                      position="absolute"
+                      top={2}
+                      right={2}
                       onClick={() => handleRemoveFavorite(product.id)}
-                      disabled={removeFavoriteMutation.isLoading}
-                    >
-                      <Favorite color="error" />
-                    </IconButton>
+                      isLoading={removeFavoriteMutation.isPending}
+                    />
                   </Box>
 
-                  <CardContent sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
-                    <Typography
-                      variant="h6"
-                      noWrap
-                      sx={{ cursor: 'pointer', mb: 1 }}
-                      onClick={() => navigate(`/products/${product.id}`)}
-                    >
-                      {product.title}
-                    </Typography>
+                  <CardBody p={4}>
+                    <VStack align="start" spacing={3}>
+                      <Text
+                        fontWeight="semibold"
+                        fontSize="md"
+                        noOfLines={2}
+                        cursor="pointer"
+                        onClick={() => window.location.href = `/products/${product.id}`}
+                        _hover={{ color: 'brand.500' }}
+                      >
+                        {product.title}
+                      </Text>
 
-                    <Typography variant="h6" color="primary" sx={{ fontWeight: 'bold', mb: 1 }}>
-                      ${product.price}
-                    </Typography>
+                      <Text fontSize="xl" fontWeight="bold" color="brand.500">
+                        ${product.price}
+                      </Text>
 
-                    <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                      <LocationOn fontSize="small" color="action" />
-                      <Typography variant="body2" color="text.secondary" sx={{ ml: 0.5 }}>
-                        {product.location}
-                      </Typography>
-                    </Box>
-
-                    <Box sx={{ display: 'flex', gap: 1, mb: 2, flexWrap: 'wrap' }}>
-                      <Chip
-                        label={product.condition}
-                        size="small"
-                        color="secondary"
-                        variant="outlined"
-                      />
-                      {product.is_negotiable && (
-                        <Chip
-                          label="Negotiable"
-                          size="small"
-                          color="primary"
-                          variant="outlined"
-                        />
+                      {product.original_price && product.original_price > product.price && (
+                        <Text fontSize="sm" color="gray.500" textDecoration="line-through">
+                          ${product.original_price}
+                        </Text>
                       )}
-                    </Box>
 
-                    <Box sx={{ mt: 'auto' }}>
-                      <Stack direction="row" spacing={1}>
+                      <HStack spacing={2}>
+                        <Badge colorScheme="blue" variant="outline">
+                          {product.condition}
+                        </Badge>
+                        {product.is_negotiable && (
+                          <Badge colorScheme="green" variant="outline">
+                            Negotiable
+                          </Badge>
+                        )}
+                      </HStack>
+
+                      <Text fontSize="sm" color="gray.600" noOfLines={1}>
+                        {product.location}
+                      </Text>
+
+                      <Text fontSize="sm" color="gray.600">
+                        by {product.seller_name}
+                      </Text>
+
+                      {/* Action Buttons */}
+                      <HStack spacing={2} w="full">
                         <Button
-                          variant="outlined"
-                          size="small"
-                          startIcon={<Visibility />}
-                          onClick={() => navigate(`/products/${product.id}`)}
-                          sx={{ flex: 1 }}
+                          size="sm"
+                          colorScheme="brand"
+                          flex={1}
+                          onClick={() => window.location.href = `/products/${product.id}`}
                         >
                           View
                         </Button>
+                        
                         <Button
-                          variant="outlined"
-                          size="small"
-                          startIcon={<Chat />}
+                          size="sm"
+                          variant="outline"
+                          flex={1}
+                          leftIcon={<ChatIcon />}
                           onClick={() => handleStartChat(product.id)}
-                          sx={{ flex: 1 }}
                         >
                           Chat
                         </Button>
-                        {product.is_negotiable && (
-                          <Button
-                            variant="contained"
-                            size="small"
-                            startIcon={<LocalOffer />}
-                            onClick={() => handleMakeOffer(product.id)}
-                            sx={{ flex: 1 }}
-                          >
-                            Offer
-                          </Button>
-                        )}
-                      </Stack>
-                    </Box>
-                  </CardContent>
+                      </HStack>
+                    </VStack>
+                  </CardBody>
                 </Card>
-              </Grid>
-            ))}
-          </Grid>
-        ) : (
-          <Box sx={{ textAlign: 'center', py: 8 }}>
-            <Favorite sx={{ fontSize: 64, color: 'text.secondary', mb: 2 }} />
-            <Typography variant="h6" color="text.secondary" gutterBottom>
-              No favorites yet
-            </Typography>
-            <Typography variant="body2" color="text.secondary" sx={{ mb: 3 }}>
-              Start browsing products and save your favorites to see them here.
-            </Typography>
-            <Button
-              variant="contained"
-              size="large"
-              onClick={() => navigate('/products')}
-            >
-              Browse Products
-            </Button>
-          </Box>
-        )}
-      </Box>
-    </Container>
+              ))}
+            </SimpleGrid>
+          ) : (
+            <Card bg={cardBg} shadow="md">
+              <CardBody p={12}>
+                <VStack spacing={6} textAlign="center">
+                  <Box
+                    p={4}
+                    bg="red.100"
+                    color="red.600"
+                    borderRadius="full"
+                    fontSize="2xl"
+                  >
+                    ❤️
+                  </Box>
+                  
+                  <VStack spacing={2}>
+                    <Heading as="h2" size="lg">
+                      No favorites yet
+                    </Heading>
+                    <Text color="gray.600">
+                      Start browsing products and add them to your favorites
+                    </Text>
+                  </VStack>
+                  
+                  <Button
+                    colorScheme="brand"
+                    size="lg"
+                    onClick={() => window.location.href = '/products'}
+                  >
+                    Browse Products
+                  </Button>
+                </VStack>
+              </CardBody>
+            </Card>
+          )}
+        </VStack>
+      </Container>
+    </Box>
   );
 };
 

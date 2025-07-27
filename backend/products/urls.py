@@ -30,6 +30,7 @@ urlpatterns = [
     path('favorites/', views.FavoriteListView.as_view(), name='favorite-list'),
     path('favorites/add/', views.FavoriteCreateView.as_view(), name='add-favorite'),
     path('favorites/<int:product_id>/remove/', views.remove_favorite, name='remove-favorite'),
+    path('<int:product_id>/toggle-favorite/', views.toggle_favorite, name='toggle-favorite'),
     
     # Search and discovery
     path('search/', views.search_products, name='search-products'),

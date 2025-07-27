@@ -2,121 +2,130 @@ import React from 'react';
 import {
   Box,
   Container,
-  Typography,
+  SimpleGrid,
+  Stack,
+  Text,
+  Flex,
+  Badge,
   Link,
-  Grid,
-  Divider,
-} from '@mui/material';
-import {
-  Facebook,
-  Twitter,
-  Instagram,
-  LinkedIn,
-  Email,
-  Phone,
-  LocationOn,
-} from '@mui/icons-material';
+} from '@chakra-ui/react';
+import { ExternalLinkIcon } from '@chakra-ui/icons';
 
 const Footer: React.FC = () => {
   return (
-    <Box
-      component="footer"
-      sx={{
-        bgcolor: 'primary.main',
-        color: 'white',
-        py: 6,
-        mt: 'auto',
-      }}
-    >
-      <Container maxWidth="lg">
-        <Grid container spacing={4}>
+    <Box bg="gray.50" borderTop="1px" borderColor="gray.200" mt="auto">
+      <Container maxW="1200px" py={8}>
+        <SimpleGrid columns={{ base: 1, md: 4 }} gap={8}>
           {/* Company Info */}
-          <Grid item xs={12} md={4}>
-            <Typography variant="h6" gutterBottom>
-              SecondHand Market
-            </Typography>
-            <Typography variant="body2" sx={{ mb: 2 }}>
-              Your trusted platform for buying and selling second-hand items. 
+          <Stack gap={4}>
+            <Text fontSize="lg" fontWeight="bold" color="brand.500">
+              SecondHand
+            </Text>
+            <Text fontSize="sm" color="gray.600">
+              Your trusted marketplace for buying and selling second-hand items. 
               Connect with local buyers and sellers in your community.
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 1 }}>
-              <Link href="#" color="inherit">
-                <Facebook />
-              </Link>
-              <Link href="#" color="inherit">
-                <Twitter />
-              </Link>
-              <Link href="#" color="inherit">
-                <Instagram />
-              </Link>
-              <Link href="#" color="inherit">
-                <LinkedIn />
-              </Link>
-            </Box>
-          </Grid>
+            </Text>
+            <Flex gap={2}>
+              <Badge colorScheme="brand" variant="outline">
+                Secure
+              </Badge>
+              <Badge colorScheme="green" variant="outline">
+                Local
+              </Badge>
+              <Badge colorScheme="purple" variant="outline">
+                Eco-friendly
+              </Badge>
+            </Flex>
+          </Stack>
 
           {/* Quick Links */}
-          <Grid item xs={12} md={4}>
-            <Typography variant="h6" gutterBottom>
+          <Stack gap={4}>
+            <Text fontWeight="semibold" fontSize="md">
               Quick Links
-            </Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
-              <Link href="/products" color="inherit" underline="hover">
+            </Text>
+            <Stack gap={2}>
+              <Link href="/products" color="gray.600" _hover={{ color: 'brand.500' }}>
                 Browse Products
               </Link>
-              <Link href="/about" color="inherit" underline="hover">
-                About Us
+              <Link href="/create-product" color="gray.600" _hover={{ color: 'brand.500' }}>
+                Sell Your Items
               </Link>
-              <Link href="/contact" color="inherit" underline="hover">
-                Contact
+              <Link href="/categories" color="gray.600" _hover={{ color: 'brand.500' }}>
+                Categories
               </Link>
-              <Link href="/help" color="inherit" underline="hover">
+              <Link href="/how-it-works" color="gray.600" _hover={{ color: 'brand.500' }}>
+                How It Works
+              </Link>
+            </Stack>
+          </Stack>
+
+          {/* Support */}
+          <Stack gap={4}>
+            <Text fontWeight="semibold" fontSize="md">
+              Support
+            </Text>
+            <Stack gap={2}>
+              <Link href="/help" color="gray.600" _hover={{ color: 'brand.500' }}>
                 Help Center
               </Link>
-              <Link href="/terms" color="inherit" underline="hover">
+              <Link href="/contact" color="gray.600" _hover={{ color: 'brand.500' }}>
+                Contact Us
+              </Link>
+              <Link href="/disputes" color="gray.600" _hover={{ color: 'brand.500' }}>
+                Dispute Resolution
+              </Link>
+              <Link href="/safety" color="gray.600" _hover={{ color: 'brand.500' }}>
+                Safety Tips
+              </Link>
+            </Stack>
+          </Stack>
+
+          {/* Legal */}
+          <Stack gap={4}>
+            <Text fontWeight="semibold" fontSize="md">
+              Legal
+            </Text>
+            <Stack gap={2}>
+              <Link href="/terms" color="gray.600" _hover={{ color: 'brand.500' }}>
                 Terms of Service
               </Link>
-              <Link href="/privacy" color="inherit" underline="hover">
+              <Link href="/privacy" color="gray.600" _hover={{ color: 'brand.500' }}>
                 Privacy Policy
               </Link>
-            </Box>
-          </Grid>
+              <Link href="/cookies" color="gray.600" _hover={{ color: 'brand.500' }}>
+                Cookie Policy
+              </Link>
+              <Link href="/accessibility" color="gray.600" _hover={{ color: 'brand.500' }}>
+                Accessibility
+              </Link>
+            </Stack>
+          </Stack>
+        </SimpleGrid>
 
-          {/* Contact Info */}
-          <Grid item xs={12} md={4}>
-            <Typography variant="h6" gutterBottom>
-              Contact Us
-            </Typography>
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Email fontSize="small" />
-                <Typography variant="body2">
-                  support@secondhandmarket.com
-                </Typography>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Phone fontSize="small" />
-                <Typography variant="body2">
-                  +1 (555) 123-4567
-                </Typography>
-              </Box>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <LocationOn fontSize="small" />
-                <Typography variant="body2">
-                  123 Market Street, City, State 12345
-                </Typography>
-              </Box>
-            </Box>
-          </Grid>
-        </Grid>
-
-        <Divider sx={{ my: 3, borderColor: 'rgba(255,255,255,0.2)' }} />
-
-        {/* Copyright */}
-        <Box sx={{ textAlign: 'center' }}>
-          <Typography variant="body2">
-            © {new Date().getFullYear()} SecondHand Market. All rights reserved.
-          </Typography>
+        {/* Bottom Section */}
+        <Box borderTop="1px" borderColor="gray.200" mt={8} pt={6}>
+          <Flex
+            direction={{ base: 'column', md: 'row' }}
+            justify="space-between"
+            align={{ base: 'flex-start', md: 'center' }}
+            gap={4}
+          >
+            <Text fontSize="sm" color="gray.600">
+              © 2024 SecondHand. All rights reserved.
+            </Text>
+            <Flex gap={4} fontSize="sm" color="gray.600">
+              <Link href="/sitemap" _hover={{ color: 'brand.500' }}>
+                Sitemap
+              </Link>
+              <Link href="/status" _hover={{ color: 'brand.500' }}>
+                Status
+              </Link>
+              <Link href="/api" _hover={{ color: 'brand.500' }}>
+                API
+                <ExternalLinkIcon mx="2px" />
+              </Link>
+            </Flex>
+          </Flex>
         </Box>
       </Container>
     </Box>

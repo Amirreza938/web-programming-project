@@ -2,483 +2,459 @@ import React, { useState } from 'react';
 import {
   Box,
   Container,
-  Grid,
-  Card,
-  CardContent,
-  CardMedia,
-  Typography,
-  Chip,
+  Heading,
+  Text,
   Button,
-  TextField,
-  Paper,
-  Avatar,
-  Rating,
-  Divider,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  Alert,
-  CircularProgress,
-  Stack,
-  IconButton,
+  Card,
+  CardBody,
+  Image,
   Badge,
-} from '@mui/material';
+  Flex,
+  VStack,
+  HStack,
+  Divider,
+  Textarea,
+  Input,
+  useToast,
+  Spinner,
+  Center,
+  SimpleGrid,
+  Avatar,
+  IconButton,
+  useColorModeValue,
+  Modal,
+  ModalOverlay,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalCloseButton,
+  useDisclosure,
+} from '@chakra-ui/react';
 import {
-  Favorite,
-  FavoriteBorder,
-  LocationOn,
-  Visibility,
-  Chat,
-  LocalOffer,
-  Person,
-  Star,
-} from '@mui/icons-material';
+  StarIcon,
+  ViewIcon,
+  ChatIcon,
+  CalendarIcon,
+} from '@chakra-ui/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiService } from '../services/api';
-import LoadingSpinner from '../components/common/LoadingSpinner';
 import { useAuth } from '../contexts/AuthContext';
+import LoadingSpinner from '../components/common/LoadingSpinner';
 
 const ProductDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
+  const toast = useToast();
   const queryClient = useQueryClient();
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  
+  const bg = useColorModeValue('white', 'gray.800');
+  const cardBg = useColorModeValue('white', 'gray.700');
 
+  // State
   const [selectedImage, setSelectedImage] = useState(0);
-  const [offerDialogOpen, setOfferDialogOpen] = useState(false);
-  const [chatDialogOpen, setChatDialogOpen] = useState(false);
   const [offerAmount, setOfferAmount] = useState('');
-  const [offerMessage, setOfferMessage] = useState('');
-  const [chatMessage, setChatMessage] = useState('');
+  const [message, setMessage] = useState('');
 
   // Fetch product details
-  const { data: product, isLoading } = useQuery({
+  const { data: product, isLoading, error } = useQuery({
     queryKey: ['product', id],
     queryFn: () => apiService.getProduct(parseInt(id!)),
     enabled: !!id,
   });
 
-  // Fetch product offers
-  const { data: offers } = useQuery({
-    queryKey: ['productOffers', id],
-    queryFn: () => apiService.getProductOffers(parseInt(id!)),
-    enabled: !!id && user?.user_type !== 'buyer',
-  });
-
   // Mutations
   const favoriteMutation = useMutation({
-    mutationFn: async ({ productId, isFavorited }: { productId: number; isFavorited: boolean }) => {
-      if (isFavorited) {
-        await apiService.removeFromFavorites(productId);
-      } else {
-        await apiService.addToFavorites(productId);
-      }
-    },
+    mutationFn: (productId: number) => apiService.toggleFavorite(productId),
     onSuccess: () => {
-      queryClient.invalidateQueries(['product', id]);
+      queryClient.invalidateQueries({ queryKey: ['product', id] });
+      toast({
+        title: 'Success',
+        description: 'Product added to favorites!',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'Failed to update favorites.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
     },
   });
 
   const offerMutation = useMutation({
-    mutationFn: async () => {
-      await apiService.createOffer({
-        product: parseInt(id!),
-        amount: parseFloat(offerAmount),
-        message: offerMessage,
+    mutationFn: (data: { productId: number; amount: number }) => 
+      apiService.createOffer(data.productId, { amount: data.amount, message }),
+    onSuccess: () => {
+      setOfferAmount('');
+      onClose();
+      toast({
+        title: 'Offer sent!',
+        description: 'Your offer has been sent to the seller.',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
       });
     },
-    onSuccess: () => {
-      setOfferDialogOpen(false);
-      setOfferAmount('');
-      setOfferMessage('');
-      queryClient.invalidateQueries(['productOffers', id]);
+    onError: (error: any) => {
+      toast({
+        title: 'Error',
+        description: error.response?.data?.message || 'Failed to send offer.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
     },
   });
 
   const chatMutation = useMutation({
-    mutationFn: async () => {
-      const response = await apiService.createConversation(parseInt(id!), chatMessage);
-      return response;
+    mutationFn: (productId: number) => apiService.createConversation(productId),
+    onSuccess: (data: any) => {
+      // The backend returns { conversation_id: number } or the full conversation object
+      const conversationId = data.conversation_id || data.id;
+      navigate(`/chat?conversation=${conversationId}`);
     },
-    onSuccess: (data) => {
-      setChatDialogOpen(false);
-      setChatMessage('');
-      navigate(`/chat?conversation=${data.conversation_id}`);
+    onError: () => {
+      toast({
+        title: 'Error',
+        description: 'Failed to start conversation.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
     },
   });
 
-  if (isLoading || !product) {
+  const handleFavorite = () => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+    favoriteMutation.mutate(parseInt(id!));
+  };
+
+  const handleOffer = () => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+    if (!offerAmount || parseFloat(offerAmount) <= 0) {
+      toast({
+        title: 'Invalid amount',
+        description: 'Please enter a valid offer amount.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+    offerMutation.mutate({ productId: parseInt(id!), amount: parseFloat(offerAmount) });
+  };
+
+  const handleChat = () => {
+    if (!isAuthenticated) {
+      navigate('/login');
+      return;
+    }
+    chatMutation.mutate(parseInt(id!));
+  };
+
+  if (isLoading) {
     return <LoadingSpinner />;
   }
 
-  const isOwner = user?.id === product.seller_id;
-  const canMakeOffer = user && !isOwner && product.is_negotiable;
+  if (error || !product) {
+    return (
+      <Center py={12}>
+        <VStack spacing={4}>
+          <Text fontSize="xl" color="red.500">
+            Product not found
+          </Text>
+          <Button onClick={() => navigate('/products')}>
+            Back to Products
+          </Button>
+        </VStack>
+      </Center>
+    );
+  }
 
-  const handleFavoriteToggle = () => {
-    if (!user) {
-      navigate('/login');
-      return;
-    }
-    favoriteMutation.mutate({ productId: product.id, isFavorited: product.is_favorited });
-  };
-
-  const handleMakeOffer = () => {
-    if (!user) {
-      navigate('/login');
-      return;
-    }
-    setOfferDialogOpen(true);
-  };
-
-  const handleStartChat = () => {
-    if (!user) {
-      navigate('/login');
-      return;
-    }
-    setChatDialogOpen(true);
-  };
-
-  const handleOfferSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!offerAmount || parseFloat(offerAmount) <= 0) return;
-    offerMutation.mutate();
-  };
-
-  const handleChatSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!chatMessage.trim()) return;
-    chatMutation.mutate();
-  };
+  const isOwner = user?.id === product.seller;
 
   return (
-    <Container maxWidth="lg">
-      <Box sx={{ py: 3 }}>
-        <Grid container spacing={4}>
-          {/* Product Images */}
-          <Grid item xs={12} md={6}>
-            <Card>
-              <CardMedia
-                component="img"
-                height="400"
-                image={product.main_image || 'https://via.placeholder.com/600x400?text=No+Image'}
-                alt={product.title}
-                sx={{ objectFit: 'cover' }}
-              />
-              {/* Image Gallery */}
-              {product.images && product.images.length > 1 && (
-                <Box sx={{ p: 2 }}>
-                  <Grid container spacing={1}>
-                    {product.images.map((image: string, index: number) => (
-                      <Grid item key={index}>
-                        <CardMedia
-                          component="img"
-                          height="80"
-                          width="80"
-                          image={image}
-                          alt={`${product.title} ${index + 1}`}
-                          sx={{
-                            cursor: 'pointer',
-                            border: selectedImage === index ? '2px solid #1976d2' : '2px solid transparent',
-                          }}
-                          onClick={() => setSelectedImage(index)}
-                        />
-                      </Grid>
-                    ))}
-                  </Grid>
-                </Box>
-              )}
-            </Card>
-          </Grid>
-
-          {/* Product Info */}
-          <Grid item xs={12} md={6}>
-            <Stack spacing={3}>
-              {/* Title and Price */}
-              <Box>
-                <Typography variant="h4" gutterBottom>
-                  {product.title}
-                </Typography>
-                <Typography variant="h3" color="primary" sx={{ fontWeight: 'bold' }}>
-                  ${product.price}
-                </Typography>
-                {product.original_price && product.original_price > product.price && (
-                  <Typography variant="h6" color="text.secondary" sx={{ textDecoration: 'line-through' }}>
-                    ${product.original_price}
-                  </Typography>
-                )}
-              </Box>
-
-              {/* Condition and Location */}
-              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-                <Chip
-                  label={product.condition}
-                  color="secondary"
-                  variant="outlined"
+    <Box minH="100vh" bg="gray.50" py={8}>
+      <Container maxW="1200px">
+        <VStack spacing={8} align="stretch">
+          {/* Product Images and Details */}
+          <SimpleGrid columns={{ base: 1, lg: 2 }} gap={8}>
+            {/* Product Images */}
+            <VStack spacing={4}>
+              <Box position="relative" w="full">
+                <Image
+                  src={product.images?.[selectedImage]?.image || product.main_image || 'https://via.placeholder.com/500x400?text=No+Image'}
+                  alt={product.title}
+                  w="full"
+                  h="400px"
+                  objectFit="cover"
+                  borderRadius="lg"
                 />
-                {product.is_negotiable && (
-                  <Chip
-                    label="Price Negotiable"
-                    color="primary"
-                    variant="outlined"
-                  />
+                {product.images && product.images.length > 1 && (
+                  <HStack spacing={2} mt={4} justify="center">
+                    {product.images.map((img: any, index: number) => (
+                      <Image
+                        key={index}
+                        src={img.image}
+                        alt={`${product.title} ${index + 1}`}
+                        w="80px"
+                        h="80px"
+                        objectFit="cover"
+                        borderRadius="md"
+                        cursor="pointer"
+                        border={selectedImage === index ? '2px solid' : '1px solid'}
+                        borderColor={selectedImage === index ? 'brand.500' : 'gray.200'}
+                        onClick={() => setSelectedImage(index)}
+                      />
+                    ))}
+                  </HStack>
                 )}
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <LocationOn fontSize="small" color="action" />
-                  <Typography variant="body2" color="text.secondary">
-                    {product.location}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                  <Visibility fontSize="small" color="action" />
-                  <Typography variant="body2" color="text.secondary">
-                    {product.views_count} views
-                  </Typography>
-                </Box>
               </Box>
+            </VStack>
 
-              {/* Seller Info */}
-              <Paper sx={{ p: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                  <Avatar sx={{ bgcolor: 'primary.main' }}>
-                    <Person />
-                  </Avatar>
-                  <Box>
-                    <Typography variant="h6">
-                      {product.seller_name}
-                    </Typography>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Rating value={product.seller_rating} readOnly size="small" />
-                      <Typography variant="body2" color="text.secondary">
-                        ({product.seller_rating.toFixed(1)})
-                      </Typography>
-                    </Box>
-                  </Box>
-                </Box>
-                <Button
-                  variant="outlined"
-                  startIcon={<Chat />}
-                  onClick={handleStartChat}
-                  fullWidth
-                >
-                  Contact Seller
-                </Button>
-              </Paper>
+            {/* Product Information */}
+            <VStack spacing={6} align="stretch">
+              <VStack align="start" spacing={4}>
+                <Heading as="h1" size="xl">
+                  {product.title}
+                </Heading>
+                
+                <HStack spacing={4}>
+                  <Text fontSize="2xl" fontWeight="bold" color="brand.500">
+                    ${product.price}
+                  </Text>
+                  {product.original_price && product.original_price > product.price && (
+                    <Text fontSize="lg" color="gray.500" textDecoration="line-through">
+                      ${product.original_price}
+                    </Text>
+                  )}
+                </HStack>
+
+                <HStack spacing={3}>
+                  <Badge colorScheme="blue" variant="outline" size="lg">
+                    {product.condition}
+                  </Badge>
+                  {product.is_negotiable && (
+                    <Badge colorScheme="green" variant="outline" size="lg">
+                      Negotiable
+                    </Badge>
+                  )}
+                  {product.is_featured && (
+                    <Badge colorScheme="purple" variant="outline" size="lg">
+                      Featured
+                    </Badge>
+                  )}
+                </HStack>
+
+                <Text fontSize="lg" color="gray.700">
+                  {product.description}
+                </Text>
+
+                <VStack align="start" spacing={2}>
+                  <HStack spacing={2} color="gray.600">
+                    <ViewIcon />
+                    <Text>{product.views_count} views</Text>
+                  </HStack>
+                  <HStack spacing={2} color="gray.600">
+                    <CalendarIcon />
+                    <Text>Listed {new Date(product.created_at).toLocaleDateString()}</Text>
+                  </HStack>
+                </VStack>
+              </VStack>
+
+              <Divider />
+
+              {/* Seller Information */}
+              <VStack align="start" spacing={4}>
+                <Heading as="h3" size="md">
+                  Seller Information
+                </Heading>
+                <HStack spacing={4}>
+                  <Avatar
+                    size="md"
+                    name={product.seller_name}
+                    src={product.seller_image}
+                  />
+                  <VStack align="start" spacing={1}>
+                    <Text fontWeight="semibold">{product.seller_name}</Text>
+                    <HStack spacing={2}>
+                      <StarIcon color="yellow.400" />
+                      <Text fontSize="sm" color="gray.600">
+                        {product.seller_rating || 'No ratings'} ({product.seller_ratings_count || 0} reviews)
+                      </Text>
+                    </HStack>
+                    {product.seller_verified && (
+                      <Badge colorScheme="green" size="sm">
+                        Verified Seller
+                      </Badge>
+                    )}
+                  </VStack>
+                </HStack>
+              </VStack>
+
+              <Divider />
 
               {/* Action Buttons */}
-              <Stack direction="row" spacing={2}>
-                {canMakeOffer && (
-                  <Button
-                    variant="contained"
-                    startIcon={<LocalOffer />}
-                    onClick={handleMakeOffer}
-                    sx={{ flex: 1 }}
-                  >
-                    Make Offer
+              {!isOwner && (
+                <VStack spacing={4}>
+                  <HStack spacing={4} w="full">
+                    <Button
+                      colorScheme="brand"
+                      size="lg"
+                      flex={1}
+                      onClick={handleChat}
+                      leftIcon={<ChatIcon />}
+                      isLoading={chatMutation.isPending}
+                    >
+                      Chat with Seller
+                    </Button>
+                    <IconButton
+                      size="lg"
+                      aria-label="Add to favorites"
+                      icon={<StarIcon />}
+                      colorScheme={product.is_favorited ? 'red' : 'gray'}
+                      variant={product.is_favorited ? 'solid' : 'outline'}
+                      onClick={handleFavorite}
+                      isLoading={favoriteMutation.isPending}
+                    />
+                  </HStack>
+                  
+                  {product.is_negotiable && (
+                    <Button
+                      variant="outline"
+                      size="lg"
+                      w="full"
+                      onClick={onOpen}
+                    >
+                      Make an Offer
+                    </Button>
+                  )}
+                </VStack>
+              )}
+
+              {isOwner && (
+                <VStack spacing={4}>
+                  <Text color="gray.600" textAlign="center">
+                    This is your listing
+                  </Text>
+                  <HStack spacing={4} w="full">
+                    <Button
+                      colorScheme="brand"
+                      variant="outline"
+                      flex={1}
+                      onClick={() => navigate(`/products/${id}/edit`)}
+                    >
+                      Edit Listing
+                    </Button>
+                    <Button
+                      colorScheme="red"
+                      variant="outline"
+                      flex={1}
+                    >
+                      Delete Listing
+                    </Button>
+                  </HStack>
+                </VStack>
+              )}
+            </VStack>
+          </SimpleGrid>
+
+          {/* Additional Information */}
+          <SimpleGrid columns={{ base: 1, md: 2 }} gap={8}>
+            {/* Shipping Information */}
+            <Card bg={cardBg}>
+              <CardBody>
+                <VStack align="start" spacing={4}>
+                  <Heading as="h3" size="md">
+                    Shipping & Payment
+                  </Heading>
+                  <VStack align="start" spacing={2}>
+                    <Text><strong>Shipping:</strong> {product.shipping_method || 'Not specified'}</Text>
+                    <Text><strong>Payment:</strong> {product.payment_method || 'Not specified'}</Text>
+                    <Text><strong>Returns:</strong> {product.return_policy || 'Not specified'}</Text>
+                  </VStack>
+                </VStack>
+              </CardBody>
+            </Card>
+
+            {/* Product Specifications */}
+            <Card bg={cardBg}>
+              <CardBody>
+                <VStack align="start" spacing={4}>
+                  <Heading as="h3" size="md">
+                    Specifications
+                  </Heading>
+                  <VStack align="start" spacing={2}>
+                    <Text><strong>Category:</strong> {product.category_name}</Text>
+                    <Text><strong>Brand:</strong> {product.brand || 'Not specified'}</Text>
+                    <Text><strong>Model:</strong> {product.model || 'Not specified'}</Text>
+                    <Text><strong>Year:</strong> {product.year || 'Not specified'}</Text>
+                  </VStack>
+                </VStack>
+              </CardBody>
+            </Card>
+          </SimpleGrid>
+        </VStack>
+
+        {/* Offer Modal */}
+        <Modal isOpen={isOpen} onClose={onClose}>
+          <ModalOverlay />
+          <ModalContent>
+            <ModalHeader>Make an Offer</ModalHeader>
+            <ModalCloseButton />
+            <ModalBody pb={6}>
+              <VStack spacing={4}>
+                <Text>
+                  Current price: <strong>${product.price}</strong>
+                </Text>
+                <Input
+                  type="number"
+                  value={offerAmount}
+                  onChange={(e) => setOfferAmount(e.target.value)}
+                  placeholder="Enter your offer"
+                  min="0"
+                  step="0.01"
+                />
+                <Textarea
+                  placeholder="Add a message to your offer (optional)"
+                  value={message}
+                  onChange={(e) => setMessage(e.target.value)}
+                  rows={3}
+                />
+                <HStack spacing={4} w="full">
+                  <Button onClick={onClose} variant="outline" flex={1}>
+                    Cancel
                   </Button>
-                )}
-                <IconButton
-                  onClick={handleFavoriteToggle}
-                  color={product.is_favorited ? 'error' : 'default'}
-                >
-                  {product.is_favorited ? <Favorite /> : <FavoriteBorder />}
-                </IconButton>
-              </Stack>
-
-              {/* Description */}
-              <Paper sx={{ p: 2 }}>
-                <Typography variant="h6" gutterBottom>
-                  Description
-                </Typography>
-                <Typography variant="body1" sx={{ whiteSpace: 'pre-wrap' }}>
-                  {product.description}
-                </Typography>
-              </Paper>
-
-              {/* Product Details */}
-              <Paper sx={{ p: 2 }}>
-                <Typography variant="h6" gutterBottom>
-                  Product Details
-                </Typography>
-                <Grid container spacing={2}>
-                  <Grid item xs={6}>
-                    <Typography variant="body2" color="text.secondary">
-                      Category
-                    </Typography>
-                    <Typography variant="body1">
-                      {product.category_name}
-                    </Typography>
-                  </Grid>
-                  {product.brand && (
-                    <Grid item xs={6}>
-                      <Typography variant="body2" color="text.secondary">
-                        Brand
-                      </Typography>
-                      <Typography variant="body1">
-                        {product.brand}
-                      </Typography>
-                    </Grid>
-                  )}
-                  {product.model && (
-                    <Grid item xs={6}>
-                      <Typography variant="body2" color="text.secondary">
-                        Model
-                      </Typography>
-                      <Typography variant="body1">
-                        {product.model}
-                      </Typography>
-                    </Grid>
-                  )}
-                  <Grid item xs={6}>
-                    <Typography variant="body2" color="text.secondary">
-                      Listed
-                    </Typography>
-                    <Typography variant="body1">
-                      {new Date(product.created_at).toLocaleDateString()}
-                    </Typography>
-                  </Grid>
-                </Grid>
-              </Paper>
-            </Stack>
-          </Grid>
-        </Grid>
-
-        {/* Offers Section (for sellers) */}
-        {isOwner && offers && offers.length > 0 && (
-          <Box sx={{ mt: 4 }}>
-            <Typography variant="h5" gutterBottom>
-              Offers ({offers.length})
-            </Typography>
-            <Grid container spacing={2}>
-              {offers.map((offer) => (
-                <Grid item xs={12} sm={6} md={4} key={offer.id}>
-                  <Card>
-                    <CardContent>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                        <Avatar sx={{ bgcolor: 'secondary.main' }}>
-                          {offer.buyer_name[0]}
-                        </Avatar>
-                        <Box>
-                          <Typography variant="h6">
-                            {offer.buyer_name}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            {new Date(offer.created_at).toLocaleDateString()}
-                          </Typography>
-                        </Box>
-                      </Box>
-                      <Typography variant="h6" color="primary" gutterBottom>
-                        ${offer.amount}
-                      </Typography>
-                      {offer.message && (
-                        <Typography variant="body2" color="text.secondary">
-                          "{offer.message}"
-                        </Typography>
-                      )}
-                      <Box sx={{ mt: 2, display: 'flex', gap: 1 }}>
-                        <Button
-                          size="small"
-                          variant="contained"
-                          color="success"
-                          onClick={() => {
-                            // Handle accept offer
-                          }}
-                        >
-                          Accept
-                        </Button>
-                        <Button
-                          size="small"
-                          variant="outlined"
-                          color="error"
-                          onClick={() => {
-                            // Handle reject offer
-                          }}
-                        >
-                          Reject
-                        </Button>
-                      </Box>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              ))}
-            </Grid>
-          </Box>
-        )}
-
-        {/* Offer Dialog */}
-        <Dialog open={offerDialogOpen} onClose={() => setOfferDialogOpen(false)} maxWidth="sm" fullWidth>
-          <DialogTitle>Make an Offer</DialogTitle>
-          <Box component="form" onSubmit={handleOfferSubmit}>
-            <DialogContent>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                Current price: ${product.price}
-              </Typography>
-              <TextField
-                fullWidth
-                label="Your Offer Amount ($)"
-                type="number"
-                value={offerAmount}
-                onChange={(e) => setOfferAmount(e.target.value)}
-                inputProps={{ min: 0, step: 0.01 }}
-                sx={{ mb: 2 }}
-              />
-              <TextField
-                fullWidth
-                label="Message (Optional)"
-                multiline
-                rows={3}
-                value={offerMessage}
-                onChange={(e) => setOfferMessage(e.target.value)}
-                placeholder="Tell the seller why you're making this offer..."
-              />
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setOfferDialogOpen(false)}>Cancel</Button>
-              <Button
-                type="submit"
-                variant="contained"
-                disabled={!offerAmount || parseFloat(offerAmount) <= 0 || offerMutation.isLoading}
-              >
-                {offerMutation.isLoading ? <CircularProgress size={20} /> : 'Send Offer'}
-              </Button>
-            </DialogActions>
-          </Box>
-        </Dialog>
-
-        {/* Chat Dialog */}
-        <Dialog open={chatDialogOpen} onClose={() => setChatDialogOpen(false)} maxWidth="sm" fullWidth>
-          <DialogTitle>Start a Conversation</DialogTitle>
-          <Box component="form" onSubmit={handleChatSubmit}>
-            <DialogContent>
-              <Typography variant="body2" color="text.secondary" gutterBottom>
-                Send a message to {product.seller_name} about "{product.title}"
-              </Typography>
-              <TextField
-                fullWidth
-                label="Message"
-                multiline
-                rows={4}
-                value={chatMessage}
-                onChange={(e) => setChatMessage(e.target.value)}
-                placeholder="Hi! I'm interested in your item..."
-              />
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setChatDialogOpen(false)}>Cancel</Button>
-              <Button
-                type="submit"
-                variant="contained"
-                disabled={!chatMessage.trim() || chatMutation.isLoading}
-              >
-                {chatMutation.isLoading ? <CircularProgress size={20} /> : 'Send Message'}
-              </Button>
-            </DialogActions>
-          </Box>
-        </Dialog>
-      </Box>
-    </Container>
+                  <Button
+                    colorScheme="brand"
+                    onClick={handleOffer}
+                    flex={1}
+                    isLoading={offerMutation.isPending}
+                  >
+                    Send Offer
+                  </Button>
+                </HStack>
+              </VStack>
+            </ModalBody>
+          </ModalContent>
+        </Modal>
+      </Container>
+    </Box>
   );
 };
 
-export default ProductDetailPage; 
+export default ProductDetailPage;
