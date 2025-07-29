@@ -108,7 +108,8 @@ class Product(models.Model):
 class ProductImage(models.Model):
     """Product images"""
     product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='images')
-    image = models.ImageField(upload_to='product_images/')
+    image = models.ImageField(upload_to='product_images/', blank=True, null=True)
+    image_url = models.URLField(blank=True, null=True, help_text="External image URL")
     is_main = models.BooleanField(default=False)
     alt_text = models.CharField(max_length=200, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -124,6 +125,15 @@ class ProductImage(models.Model):
         if self.is_main:
             ProductImage.objects.filter(product=self.product, is_main=True).update(is_main=False)
         super().save(*args, **kwargs)
+    
+    @property
+    def image_url_or_file(self):
+        """Return image URL if external, otherwise return file URL"""
+        if self.image_url:
+            return self.image_url
+        elif self.image:
+            return self.image.url
+        return None
 
 
 class Offer(models.Model):

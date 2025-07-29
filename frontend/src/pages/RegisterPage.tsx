@@ -99,12 +99,16 @@ const RegisterPage: React.FC = () => {
         duration: 5000,
         isClosable: true,
       });
-      navigate('/login');
+      navigate('/dashboard');
     } catch (err: any) {
-      setError(err.response?.data?.message || 'Registration failed. Please try again.');
+      setError(
+        err.response?.data?.message ||
+        JSON.stringify(err.response?.data) ||
+        'Registration failed. Please try again.'
+      );
       toast({
         title: 'Registration failed',
-        description: err.response?.data?.message || 'Please check your information and try again.',
+        description: err.response?.data?.message || JSON.stringify(err.response?.data) || 'Please check your information and try again.',
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -378,4 +382,4 @@ const RegisterPage: React.FC = () => {
   );
 };
 
-export default RegisterPage; 
+export default RegisterPage;

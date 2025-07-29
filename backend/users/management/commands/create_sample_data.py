@@ -185,7 +185,7 @@ class Command(BaseCommand):
                 'shipping_options': ['post', 'pickup'],
                 'shipping_cost': Decimal('15.00'),
                 'images': [
-                    'https://images.unsplash.com/photo-1511707171634-5f897ff02aa9?auto=format&fit=crop&w=800&q=80',
+                    'product_images/iphone-12-pro-gold-1.jpg',
                 ]
             },
             {
@@ -205,7 +205,7 @@ class Command(BaseCommand):
                 'shipping_options': ['post', 'pickup'],
                 'shipping_cost': Decimal('25.00'),
                 'images': [
-                    'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=800&q=80',
+                    'product_images/mac_book.jpg',
                 ]
             },
             {
@@ -225,7 +225,7 @@ class Command(BaseCommand):
                 'shipping_options': ['post', 'pickup'],
                 'shipping_cost': Decimal('20.00'),
                 'images': [
-                    'https://images.unsplash.com/photo-1512436991641-6745cdb1723f?auto=format&fit=crop&w=800&q=80',
+                    'product_images/louis.jpg',
                 ]
             },
             {
@@ -245,7 +245,7 @@ class Command(BaseCommand):
                 'shipping_options': ['pickup'],
                 'shipping_cost': Decimal('0.00'),
                 'images': [
-                    'https://images.unsplash.com/photo-1506744038136-46273834b3fb?auto=format&fit=crop&w=800&q=80',
+                    'product_images/table.jpg',
                 ]
             },
             {
@@ -265,7 +265,7 @@ class Command(BaseCommand):
                 'shipping_options': ['post', 'pickup'],
                 'shipping_cost': Decimal('10.00'),
                 'images': [
-                    'https://images.unsplash.com/photo-1511367461989-f85a21fda167?auto=format&fit=crop&w=800&q=80',
+                    'product_images/sony.jpg',
                 ]
             }
         ]
@@ -280,9 +280,23 @@ class Command(BaseCommand):
             if created:
                 self.stdout.write(f'Created product: {product.title}')
                 # Add images
-                for idx, img_url in enumerate(images):
-                    ProductImage.objects.create(
+                for idx, img_path in enumerate(images):
+                    # Create ProductImage with local file
+                    product_image = ProductImage.objects.create(
                         product=product,
-                        image=img_url,
                         is_main=(idx == 0)
-                    ) 
+                    )
+                    
+                    # Set the image field to the local file path
+                    from django.core.files import File
+                    import os
+                    from django.conf import settings
+                    
+                    full_path = os.path.join(settings.MEDIA_ROOT, img_path)
+                    if os.path.exists(full_path):
+                        with open(full_path, 'rb') as f:
+                            product_image.image.save(
+                                os.path.basename(img_path),
+                                File(f),
+                                save=True
+                            ) 

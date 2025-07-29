@@ -27,38 +27,39 @@ class CategoryDetailView(generics.RetrieveAPIView):
     permission_classes = [permissions.AllowAny]
 
 
-class ProductListView(generics.ListAPIView):
-    """List products with filtering and search"""
-    serializer_class = ProductListSerializer
-    permission_classes = [permissions.AllowAny]
+class ProductListCreateView(generics.ListCreateAPIView):
+    """List products (GET) and create a new product (POST)"""
+    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['category', 'condition', 'city', 'country', 'is_negotiable']
     search_fields = ['title', 'description', 'brand', 'model']
     ordering_fields = ['price', 'created_at', 'views_count', 'favorites_count']
     ordering = ['-created_at']
-    
+
     def get_queryset(self):
         queryset = Product.objects.filter(is_active=True, status='active')
-        
-        # Price filtering
         min_price = self.request.query_params.get('min_price')
         max_price = self.request.query_params.get('max_price')
-        
         if min_price:
             queryset = queryset.filter(price__gte=min_price)
         if max_price:
             queryset = queryset.filter(price__lte=max_price)
-        
-        # Location filtering
         location = self.request.query_params.get('location')
         if location:
             queryset = queryset.filter(
-                Q(city__icontains=location) | 
+                Q(city__icontains=location) |
                 Q(country__icontains=location) |
                 Q(location__icontains=location)
             )
-        
         return queryset
+
+    def get_serializer_class(self):
+        if self.request.method == 'POST':
+            return ProductCreateSerializer
+        return ProductListSerializer
+
+    def perform_create(self, serializer):
+        serializer.save(seller=self.request.user)
 
 
 class ProductDetailView(generics.RetrieveAPIView):
@@ -73,15 +74,6 @@ class ProductDetailView(generics.RetrieveAPIView):
         instance.increment_views()
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
-
-
-class ProductCreateView(generics.CreateAPIView):
-    """Create a new product"""
-    serializer_class = ProductCreateSerializer
-    permission_classes = [permissions.IsAuthenticated]
-    
-    def perform_create(self, serializer):
-        serializer.save(seller=self.request.user)
 
 
 class ProductUpdateView(generics.UpdateAPIView):
@@ -124,6 +116,8 @@ class MyProductsView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
     
     def get_queryset(self):
+        print("[DEBUG] MyProductsView user:", self.request.user)
+        print("[DEBUG] MyProductsView headers:", dict(self.request.headers))
         return Product.objects.filter(
             seller=self.request.user
         ).order_by('-created_at')
@@ -357,7 +351,12 @@ def featured_products(request):
     ).order_by('-created_at')[:10]
     
     serializer = ProductListSerializer(products, many=True, context={'request': request})
-    return Response(serializer.data)
+    return Response({
+        'results': serializer.data,
+        'count': len(serializer.data),
+        'next': None,
+        'previous': None
+    })
 
 
 @api_view(['GET'])

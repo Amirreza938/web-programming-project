@@ -7,28 +7,50 @@ from .models import User, UserRating
 class UserRegistrationSerializer(serializers.ModelSerializer):
     """Serializer for user registration"""
     password = serializers.CharField(write_only=True, validators=[validate_password])
-    password_confirm = serializers.CharField(write_only=True)
+    password_confirm = serializers.CharField(write_only=True, required=False)
+    confirmPassword = serializers.CharField(write_only=True, required=False)  # Frontend field name
+    
+    # Frontend field name mappings
+    firstName = serializers.CharField(source='first_name', required=False)
+    lastName = serializers.CharField(source='last_name', required=False)
+    phone = serializers.CharField(source='phone_number', required=False)
+    userType = serializers.CharField(source='user_type', required=False)
+    zipCode = serializers.CharField(source='postal_code', required=False)
     
     class Meta:
         model = User
         fields = [
-            'id', 'username', 'email', 'first_name', 'last_name', 'password', 
-            'password_confirm', 'user_type', 'phone_number', 'address', 
-            'city', 'country', 'postal_code'
+            'id', 'username', 'email', 'first_name', 'last_name', 'firstName', 'lastName',
+            'password', 'password_confirm', 'confirmPassword', 'user_type', 'userType',
+            'phone_number', 'phone', 'address', 'city', 'country', 'postal_code', 'zipCode'
         ]
         extra_kwargs = {
             'password': {'write_only': True},
             'password_confirm': {'write_only': True},
+            'confirmPassword': {'write_only': True},
         }
     
     def validate(self, attrs):
-        if attrs['password'] != attrs['password_confirm']:
+        # Handle both frontend and backend field names
+        password_confirm = attrs.get('password_confirm') or attrs.get('confirmPassword')
+        if not password_confirm:
+            raise serializers.ValidationError("Password confirmation is required")
+        
+        if attrs['password'] != password_confirm:
             raise serializers.ValidationError("Passwords don't match")
+        
+        # Map frontend field names to backend field names
+        if 'confirmPassword' in attrs:
+            attrs['password_confirm'] = attrs.pop('confirmPassword')
+        
         return attrs
     
     def create(self, validated_data):
-        validated_data.pop('password_confirm')
+        validated_data.pop('password_confirm', None)
+        validated_data.pop('confirmPassword', None)
         user = User.objects.create_user(**validated_data)
+        user.is_active = True  # Ensure user is active upon registration
+        user.save()
         return user
 
 

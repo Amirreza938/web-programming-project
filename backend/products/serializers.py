@@ -24,7 +24,18 @@ class ProductImageSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = ProductImage
-        fields = ['id', 'image', 'is_main', 'alt_text', 'created_at']
+        fields = ['id', 'image', 'image_url', 'is_main', 'alt_text', 'created_at']
+    
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        # Return external URL directly, or build absolute URI for uploaded files
+        if instance.image_url:
+            data['image'] = instance.image_url
+        elif instance.image:
+            data['image'] = self.context['request'].build_absolute_uri(instance.image.url)
+        else:
+            data['image'] = None
+        return data
 
 
 class ProductListSerializer(serializers.ModelSerializer):
@@ -50,7 +61,10 @@ class ProductListSerializer(serializers.ModelSerializer):
     def get_main_image(self, obj):
         main_image = obj.get_main_image()
         if main_image:
-            return self.context['request'].build_absolute_uri(main_image.image.url)
+            if main_image.image_url:
+                return main_image.image_url
+            elif main_image.image:
+                return self.context['request'].build_absolute_uri(main_image.image.url)
         return None
     
     def get_is_favorited(self, obj):
@@ -218,7 +232,10 @@ class OfferListSerializer(serializers.ModelSerializer):
     def get_product_image(self, obj):
         main_image = obj.product.get_main_image()
         if main_image:
-            return self.context['request'].build_absolute_uri(main_image.image.url)
+            if main_image.image_url:
+                return main_image.image_url
+            elif main_image.image:
+                return self.context['request'].build_absolute_uri(main_image.image.url)
         return None
 
 

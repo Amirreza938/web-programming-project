@@ -27,10 +27,8 @@ class UserRegistrationView(APIView):
             return Response({
                 'message': 'User registered successfully',
                 'user': UserProfileSerializer(user).data,
-                'tokens': {
-                    'refresh': str(refresh),
-                    'access': str(refresh.access_token),
-                }
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
             }, status=status.HTTP_201_CREATED)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -47,10 +45,8 @@ class UserLoginView(APIView):
             return Response({
                 'message': 'Login successful',
                 'user': UserProfileSerializer(user).data,
-                'tokens': {
-                    'refresh': str(refresh),
-                    'access': str(refresh.access_token),
-                }
+                'refresh': str(refresh),
+                'access': str(refresh.access_token),
             }, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
@@ -169,6 +165,8 @@ def logout_view(request):
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def user_dashboard(request):
+    print("[DEBUG] user_dashboard user:", request.user)
+    print("[DEBUG] user_dashboard headers:", dict(request.headers))
     """Get user dashboard data"""
     user = request.user
     
@@ -179,11 +177,11 @@ def user_dashboard(request):
         'total_orders': user.orders.count(),
         'total_sales': user.sales.count(),
         'total_offers_received': user.products.aggregate(
-            total_offers=models.Count('offers')
+            total_offers=Count('offers')
         )['total_offers'] or 0,
         'total_offers_made': user.offers_made.count(),
         'unread_messages': user.buyer_conversations.aggregate(
-            unread=models.Count('messages', filter=Q(messages__is_read=False, messages__sender__ne=user))
+            unread=Count('messages', filter=Q(messages__is_read=False) & ~Q(messages__sender=user))
         )['unread'] or 0,
         'unread_notifications': user.notifications.filter(is_read=False).count(),
     }
@@ -210,13 +208,13 @@ def seller_dashboard(request):
         'sold_products': user.products.filter(status='sold').count(),
         'total_sales': user.sales.count(),
         'total_revenue': user.sales.aggregate(
-            total=models.Sum('total_amount')
+            total=Sum('total_amount')
         )['total'] or 0,
         'pending_offers': user.products.aggregate(
-            pending=models.Count('offers', filter=Q(offers__status='pending'))
+            pending=Count('offers', filter=Q(offers__status='pending'))
         )['pending'] or 0,
         'unread_messages': user.seller_conversations.aggregate(
-            unread=models.Count('messages', filter=Q(messages__is_read=False, messages__sender__ne=user))
+            unread=Count('messages', filter=Q(messages__is_read=False) & ~Q(messages__sender=user))
         )['unread'] or 0,
     }
     

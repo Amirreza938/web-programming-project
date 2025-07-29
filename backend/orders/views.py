@@ -74,6 +74,8 @@ class MyOrdersView(generics.ListAPIView):
     permission_classes = [permissions.IsAuthenticated]
     
     def get_queryset(self):
+        print("[DEBUG] MyOrdersView user:", self.request.user)
+        print("[DEBUG] MyOrdersView headers:", dict(self.request.headers))
         return Order.objects.filter(buyer=self.request.user).order_by('-created_at')
 
 

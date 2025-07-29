@@ -29,6 +29,24 @@ import { apiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 
+type ProductFormData = {
+  title: string;
+  description: string;
+  category: string;
+  condition: string;
+  price: string;
+  original_price: string;
+  brand: string;
+  model: string;
+  year: string;
+  location: string;
+  city: string;
+  country: string;
+  shipping_cost: string;
+  shipping_options: string[];
+  is_negotiable: boolean;
+};
+
 const CreateProductPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -42,7 +60,7 @@ const CreateProductPage: React.FC = () => {
   });
 
   // State
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<ProductFormData>({
     title: '',
     description: '',
     category: '',
@@ -53,10 +71,11 @@ const CreateProductPage: React.FC = () => {
     model: '',
     year: '',
     location: '',
+    city: '',
+    country: '',
+    shipping_cost: '',
+    shipping_options: [],
     is_negotiable: false,
-    shipping_method: '',
-    payment_method: '',
-    return_policy: '',
   });
 
   const [images, setImages] = useState<File[]>([]);
@@ -76,9 +95,12 @@ const CreateProductPage: React.FC = () => {
       navigate('/dashboard');
     },
     onError: (error: any) => {
+      console.error('Error creating product:', error);
       toast({
         title: 'Error creating product',
-        description: error.response?.data?.message || 'Please try again.',
+        description: error.response?.data
+          ? JSON.stringify(error.response.data)
+          : 'Please try again.',
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -127,7 +149,7 @@ const CreateProductPage: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!formData.title || !formData.description || !formData.category || !formData.price) {
+    if (!formData.title || !formData.description || !formData.category || !formData.price || !formData.city || !formData.country || !formData.shipping_cost || !formData.shipping_options.length) {
       toast({
         title: 'Missing required fields',
         description: 'Please fill in all required fields.',
@@ -143,15 +165,25 @@ const CreateProductPage: React.FC = () => {
     try {
       const formDataToSend = new FormData();
       
-      // Add form data
-      Object.entries(formData).forEach(([key, value]) => {
-        if (value !== '') {
-          formDataToSend.append(key, value.toString());
+      // Only include fields expected by backend
+      const backendFields = [
+        'category', 'title', 'description', 'condition', 'brand', 'model',
+        'price', 'original_price', 'is_negotiable', 'location', 'city',
+        'country', 'latitude', 'longitude', 'shipping_options', 'shipping_cost'
+      ];
+      backendFields.forEach((key) => {
+        const value = (formData as any)[key];
+        if (value !== '' && value !== undefined) {
+          if (key === 'shipping_options' && Array.isArray(value)) {
+            formDataToSend.append('shipping_options', JSON.stringify(value));
+          } else {
+            formDataToSend.append(key, value.toString());
+          }
         }
       });
 
       // Add images
-      images.forEach((image, index) => {
+      images.forEach((image) => {
         formDataToSend.append('images', image);
       });
 
@@ -382,13 +414,47 @@ const CreateProductPage: React.FC = () => {
                     </Heading>
                     
                     <SimpleGrid columns={{ base: 1, md: 2 }} gap={4}>
-                      <FormControl>
-                        <FormLabel>Shipping Method</FormLabel>
-                        <Select
-                          name="shipping_method"
-                          value={formData.shipping_method}
+                      <FormControl isRequired>
+                        <FormLabel>City</FormLabel>
+                        <Input
+                          name="city"
+                          value={formData.city}
                           onChange={handleInputChange}
-                          placeholder="Select shipping method"
+                          placeholder="City"
+                        />
+                      </FormControl>
+                      <FormControl isRequired>
+                        <FormLabel>Country</FormLabel>
+                        <Input
+                          name="country"
+                          value={formData.country}
+                          onChange={handleInputChange}
+                          placeholder="Country"
+                        />
+                      </FormControl>
+                      <FormControl isRequired>
+                        <FormLabel>Shipping Cost ($)</FormLabel>
+                        <Input
+                          name="shipping_cost"
+                          type="number"
+                          value={formData.shipping_cost}
+                          onChange={handleInputChange}
+                          placeholder="Shipping cost"
+                          min="0"
+                          step="0.01"
+                        />
+                      </FormControl>
+                      <FormControl isRequired>
+                        <FormLabel>Shipping Options</FormLabel>
+                        <Select
+                          name="shipping_options"
+                          multiple
+                          value={formData.shipping_options}
+                          onChange={(e) => {
+                            const options = Array.from(e.target.selectedOptions, option => option.value);
+                            setFormData(prev => ({ ...prev, shipping_options: options }));
+                          }}
+                          placeholder="Select shipping options"
                         >
                           {shippingOptions.map((option) => (
                             <option key={option.value} value={option.value}>
@@ -397,34 +463,8 @@ const CreateProductPage: React.FC = () => {
                           ))}
                         </Select>
                       </FormControl>
-
-                      <FormControl>
-                        <FormLabel>Payment Method</FormLabel>
-                        <Select
-                          name="payment_method"
-                          value={formData.payment_method}
-                          onChange={handleInputChange}
-                          placeholder="Select payment method"
-                        >
-                          {paymentOptions.map((option) => (
-                            <option key={option.value} value={option.value}>
-                              {option.label}
-                            </option>
-                          ))}
-                        </Select>
-                      </FormControl>
                     </SimpleGrid>
 
-                    <FormControl>
-                      <FormLabel>Return Policy</FormLabel>
-                      <Textarea
-                        name="return_policy"
-                        value={formData.return_policy}
-                        onChange={handleInputChange}
-                        placeholder="Describe your return policy"
-                        rows={2}
-                      />
-                    </FormControl>
                   </VStack>
 
                   <Divider />

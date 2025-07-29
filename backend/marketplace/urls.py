@@ -34,6 +34,7 @@ urlpatterns = [
     
     # App URLs
     path('api/users/', include('users.urls')),
+    path('api/auth/', include('users.urls')),  # Alias for auth endpoints
     path('api/products/', include('products.urls')),
     path('api/chat/', include('chat.urls')),
     path('api/orders/', include('orders.urls')),

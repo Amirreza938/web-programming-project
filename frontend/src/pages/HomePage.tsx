@@ -34,6 +34,18 @@ const HomePage: React.FC = () => {
   const bg = useColorModeValue('white', 'gray.800');
   const cardBg = useColorModeValue('white', 'gray.700');
 
+  // Add floating animation styles
+  const floatingAnimation = `
+    @keyframes float {
+      0%, 100% { transform: translateY(0px) rotate(0deg); }
+      50% { transform: translateY(-20px) rotate(5deg); }
+    }
+    @keyframes pulse {
+      0%, 100% { transform: scale(1) opacity(0.6); }
+      50% { transform: scale(1.1) opacity(1); }
+    }
+  `;
+
   // Fetch featured and popular products
   const { data: featuredProducts, isLoading: featuredLoading } = useQuery({
     queryKey: ['featuredProducts'],
@@ -79,13 +91,75 @@ const HomePage: React.FC = () => {
 
   return (
     <Box>
+      <style>{floatingAnimation}</style>
       {/* Hero Section */}
       <Box
-        bg="linear-gradient(135deg, brand.500 0%, brand.600 100%)"
+        bg="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+        position="relative"
         color="white"
         py={20}
+        minH="500px"
+        overflow="hidden"
+        _before={{
+          content: '""',
+          position: 'absolute',
+          top: '-50%',
+          left: '-50%',
+          right: '-50%',
+          bottom: '-50%',
+          background: 'radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.1) 0%, transparent 50%), radial-gradient(circle at 70% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 50%)',
+          zIndex: 1,
+        }}
+        _after={{
+          content: '""',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'url("data:image/svg+xml,%3Csvg width="60" height="60" viewBox="0 0 60 60" xmlns="http://www.w3.org/2000/svg"%3E%3Cg fill="none" fill-rule="evenodd"%3E%3Cg fill="%23ffffff" fill-opacity="0.05"%3E%3Ccircle cx="30" cy="30" r="2"/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")',
+          zIndex: 1,
+        }}
       >
-        <Container maxW="1200px">
+        <Container maxW="1200px" position="relative" zIndex={2}>
+          {/* Floating geometric shapes */}
+          <Box
+            position="absolute"
+            top="10%"
+            right="10%"
+            w="100px"
+            h="100px"
+            borderRadius="50%"
+            bg="rgba(255, 255, 255, 0.1)"
+            backdropFilter="blur(10px)"
+            animation="float 6s ease-in-out infinite"
+            zIndex={1}
+          />
+          <Box
+            position="absolute"
+            bottom="20%"
+            left="5%"
+            w="60px"
+            h="60px"
+            borderRadius="20px"
+            bg="rgba(255, 255, 255, 0.08)"
+            backdropFilter="blur(10px)"
+            animation="float 8s ease-in-out infinite reverse"
+            zIndex={1}
+          />
+          <Box
+            position="absolute"
+            top="60%"
+            right="20%"
+            w="80px"
+            h="80px"
+            borderRadius="50%"
+            bg="rgba(255, 255, 255, 0.06)"
+            backdropFilter="blur(10px)"
+            animation="float 7s ease-in-out infinite"
+            zIndex={1}
+          />
+          
           <VStack spacing={8} textAlign="center">
             <Heading as="h1" size="2xl" fontWeight="bold">
               Buy and Sell Second-Hand Items
@@ -179,7 +253,7 @@ const HomePage: React.FC = () => {
             </Flex>
 
             <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} gap={6}>
-              {featuredProducts?.results?.slice(0, 4).map((product: any) => (
+              {(featuredProducts?.results || (Array.isArray(featuredProducts) ? featuredProducts : []) || []).slice(0, 4).map((product: any) => (
                 <Card
                   key={product.id}
                   bg={cardBg}
@@ -220,6 +294,11 @@ const HomePage: React.FC = () => {
                   </CardBody>
                 </Card>
               ))}
+              {(!featuredProducts?.results && !Array.isArray(featuredProducts)) && (
+                <Text textAlign="center" color="gray.500" gridColumn="1 / -1">
+                  No featured products available at the moment.
+                </Text>
+              )}
             </SimpleGrid>
           </VStack>
         </Container>
@@ -285,7 +364,7 @@ const HomePage: React.FC = () => {
             </Flex>
 
             <SimpleGrid columns={{ base: 1, md: 2, lg: 4 }} gap={6}>
-              {popularProducts?.results?.slice(0, 4).map((product: any) => (
+              {(popularProducts?.results || (Array.isArray(popularProducts) ? popularProducts : []) || []).slice(0, 4).map((product: any) => (
                 <Card
                   key={product.id}
                   bg={cardBg}
@@ -326,6 +405,11 @@ const HomePage: React.FC = () => {
                   </CardBody>
                 </Card>
               ))}
+              {(!popularProducts?.results && !Array.isArray(popularProducts)) && (
+                <Text textAlign="center" color="gray.500" gridColumn="1 / -1">
+                  No popular products available at the moment.
+                </Text>
+              )}
             </SimpleGrid>
           </VStack>
         </Container>
@@ -333,40 +417,131 @@ const HomePage: React.FC = () => {
 
       {/* CTA Section */}
       <Box
-        bg="linear-gradient(135deg, brand.500 0%, brand.600 100%)"
+        bg="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
         color="white"
-        py={16}
+        py={20}
+        position="relative"
+        overflow="hidden"
+        _before={{
+          content: '""',
+          position: 'absolute',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.1) 0%, transparent 50%), radial-gradient(circle at 70% 80%, rgba(255, 255, 255, 0.1) 0%, transparent 50%)',
+          zIndex: 1,
+        }}
       >
-        <Container maxW="1200px">
-          <VStack spacing={8} textAlign="center">
-            <Heading as="h2" size="xl">
-              Ready to Start Buying and Selling?
-            </Heading>
-            <Text fontSize="lg" maxW="600px">
-              Join thousands of users who are already buying and selling 
-              second-hand items in their community.
-            </Text>
-            <HStack spacing={4}>
-              <Button
-                size="lg"
-                bg="white"
-                color="brand.500"
-                _hover={{ bg: 'gray.100' }}
-                onClick={() => navigate('/register')}
-              >
-                Get Started
-              </Button>
-              <Button
-                size="lg"
-                variant="outline"
-                borderColor="white"
-                color="white"
-                _hover={{ bg: 'whiteAlpha.200' }}
-                onClick={() => navigate('/products')}
-              >
-                Browse Now
-              </Button>
-            </HStack>
+        <Container maxW="1200px" position="relative" zIndex={2}>
+          <VStack spacing={12} textAlign="center">
+            {/* Main CTA Content */}
+            <VStack spacing={6}>
+              <Heading as="h2" size="2xl" fontWeight="bold">
+                Ready to Start Buying and Selling?
+              </Heading>
+              <Text fontSize="xl" maxW="700px" opacity={0.9}>
+                Join thousands of users who are already buying and selling 
+                second-hand items in their community. Start your journey today!
+              </Text>
+            </VStack>
+
+            {/* Statistics Section */}
+            <SimpleGrid columns={{ base: 1, md: 3 }} gap={8} w="full" maxW="800px">
+              <VStack spacing={2}>
+                <Text fontSize="4xl" fontWeight="bold" color="yellow.300">
+                  10K+
+                </Text>
+                <Text fontSize="lg" opacity={0.9}>
+                  Active Users
+                </Text>
+              </VStack>
+              <VStack spacing={2}>
+                <Text fontSize="4xl" fontWeight="bold" color="green.300">
+                  50K+
+                </Text>
+                <Text fontSize="lg" opacity={0.9}>
+                  Items Sold
+                </Text>
+              </VStack>
+              <VStack spacing={2}>
+                <Text fontSize="4xl" fontWeight="bold" color="blue.300">
+                  99%
+                </Text>
+                <Text fontSize="lg" opacity={0.9}>
+                  Satisfaction Rate
+                </Text>
+              </VStack>
+            </SimpleGrid>
+
+            {/* Action Buttons */}
+            <VStack spacing={6}>
+              <HStack spacing={6} flexWrap="wrap" justify="center">
+                <Button
+                  size="lg"
+                  bg="white"
+                  color="brand.500"
+                  px={8}
+                  py={4}
+                  fontSize="lg"
+                  fontWeight="bold"
+                  _hover={{ bg: 'gray.100', transform: 'translateY(-2px)' }}
+                  _active={{ transform: 'translateY(0)' }}
+                  transition="all 0.2s"
+                  onClick={() => navigate('/register')}
+                >
+                  Get Started Free
+                </Button>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  borderColor="white"
+                  borderWidth={2}
+                  color="white"
+                  px={8}
+                  py={4}
+                  fontSize="lg"
+                  fontWeight="bold"
+                  _hover={{ bg: 'whiteAlpha.200', transform: 'translateY(-2px)' }}
+                  _active={{ transform: 'translateY(0)' }}
+                  transition="all 0.2s"
+                  onClick={() => navigate('/products')}
+                >
+                  Browse Products
+                </Button>
+                <Button
+                  size="lg"
+                  variant="ghost"
+                  color="white"
+                  px={8}
+                  py={4}
+                  fontSize="lg"
+                  fontWeight="bold"
+                  _hover={{ bg: 'whiteAlpha.100', transform: 'translateY(-2px)' }}
+                  _active={{ transform: 'translateY(0)' }}
+                  transition="all 0.2s"
+                  onClick={() => navigate('/create-product')}
+                >
+                  Sell Your Items
+                </Button>
+              </HStack>
+              
+              {/* Trust Indicators */}
+              <HStack spacing={8} opacity={0.8} fontSize="sm">
+                <HStack spacing={2}>
+                  <Box w={2} h={2} bg="green.400" borderRadius="full" />
+                  <Text>Secure Transactions</Text>
+                </HStack>
+                <HStack spacing={2}>
+                  <Box w={2} h={2} bg="blue.400" borderRadius="full" />
+                  <Text>Verified Sellers</Text>
+                </HStack>
+                <HStack spacing={2}>
+                  <Box w={2} h={2} bg="yellow.400" borderRadius="full" />
+                  <Text>24/7 Support</Text>
+                </HStack>
+              </HStack>
+            </VStack>
           </VStack>
         </Container>
       </Box>
