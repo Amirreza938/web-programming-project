@@ -341,6 +341,8 @@ class ApiService {
   // Favorite endpoints
   async getFavorites(): Promise<Product[]> {
     const response = await this.api.get('/products/favorites/');
+    console.log('API getFavorites response:', response.data);
+    console.log('API getFavorites results:', response.data.results);
     return response.data.results;
   }
 

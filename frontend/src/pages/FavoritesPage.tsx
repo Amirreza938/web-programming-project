@@ -35,6 +35,10 @@ const FavoritesPage: React.FC = () => {
     queryFn: () => apiService.getFavorites(),
   });
 
+  // Add debug logging
+  console.log('Favorites data:', favorites);
+  console.log('Favorites loading:', isLoading);
+
   // Remove from favorites mutation
   const removeFavoriteMutation = useMutation({
     mutationFn: (productId: number) => apiService.removeFromFavorites(productId),
@@ -88,7 +92,11 @@ const FavoritesPage: React.FC = () => {
           {/* Favorites Grid */}
           {favorites && favorites.length > 0 ? (
             <SimpleGrid columns={{ base: 1, md: 2, lg: 3, xl: 4 }} gap={6}>
-              {favorites.map((product: any) => (
+              {favorites.map((favorite: any) => {
+                const product = favorite.product; // Extract product from favorite object
+                console.log('Processing favorite:', favorite);
+                console.log('Product from favorite:', product);
+                return (
                 <Card
                   key={product.id}
                   bg={cardBg}
@@ -187,7 +195,8 @@ const FavoritesPage: React.FC = () => {
                     </VStack>
                   </CardBody>
                 </Card>
-              ))}
+              );
+            })}
             </SimpleGrid>
           ) : (
             <Card bg={cardBg} shadow="md">
