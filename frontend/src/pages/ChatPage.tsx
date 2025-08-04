@@ -26,6 +26,7 @@ import { ArrowForwardIcon, SearchIcon } from '@chakra-ui/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiService } from '../services/api';
 import LoadingSpinner from '../components/common/LoadingSpinner';
+import { useAuth } from '../contexts/AuthContext';
 
 const ChatPage: React.FC = () => {
   const toast = useToast();
@@ -36,6 +37,8 @@ const ChatPage: React.FC = () => {
   const [selectedConversation, setSelectedConversation] = useState<number | null>(null);
   const [message, setMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+
+  const { user } = useAuth();
 
   // Fetch conversations
   const { data: conversations, isLoading: conversationsLoading } = useQuery({
@@ -75,6 +78,13 @@ const ChatPage: React.FC = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Auto-select the first conversation if available and none is selected
+  useEffect(() => {
+    if (!selectedConversation && conversations && conversations.length > 0) {
+      setSelectedConversation(conversations[0].id);
+    }
+  }, [conversations, selectedConversation]);
+
   const handleSendMessage = (e: React.FormEvent) => {
     e.preventDefault();
     if (!message.trim() || !selectedConversation) return;
@@ -103,6 +113,30 @@ const ChatPage: React.FC = () => {
           <Heading as="h1" size="xl" color="brand.500">
             Messages
           </Heading>
+
+          {/* Show who is talking */}
+          {selectedConversation && currentConversation && user && (
+            <Box mb={2} p={3} bg="gray.100" borderRadius="md">
+              <Text fontWeight="bold">
+                You ({user.username || user.id}) are chatting with {
+                  typeof currentConversation.other_user_name === 'string'
+                    ? currentConversation.other_user_name
+                    : (typeof currentConversation.other_user_name === 'object' && currentConversation.other_user_name && 'username' in (currentConversation.other_user_name as Record<string, unknown>)
+                        ? (currentConversation.other_user_name as { username?: string }).username
+                        : typeof currentConversation.other_user === 'object' && currentConversation.other_user && 'username' in (currentConversation.other_user as Record<string, unknown>)
+                          ? (currentConversation.other_user as { username?: string }).username
+                          : String(currentConversation.other_user_name) || String(currentConversation.other_user) || 'Unknown')
+                }
+              </Text>
+              <Text fontSize="sm" color="gray.600">
+                Your ID: {user.id} | Other user ID: {
+                  typeof currentConversation.other_user === 'object' && currentConversation.other_user && 'id' in (currentConversation.other_user as Record<string, unknown>)
+                    ? (currentConversation.other_user as { id?: string | number }).id
+                    : String(currentConversation.other_user)
+                }
+              </Text>
+            </Box>
+          )}
 
           <SimpleGrid columns={{ base: 1, lg: 3 }} gap={6} minH="600px">
             {/* Conversations List */}
@@ -318,4 +352,4 @@ const ChatPage: React.FC = () => {
   );
 };
 
-export default ChatPage; 
+export default ChatPage;

@@ -384,7 +384,9 @@ class ApiService {
   }
 
   async sendMessage(conversationId: number, message: string): Promise<Message> {
-    const response = await this.api.post(`/chat/conversations/${conversationId}/messages/`, {
+    // The backend only allows POST to /chat/messages/create/ with conversation and content
+    const response = await this.api.post(`/chat/messages/create/`, {
+      conversation: conversationId,
       content: message,
     });
     return response.data;
@@ -499,4 +501,4 @@ class ApiService {
   }
 }
 
-export const apiService = new ApiService(); 
+export const apiService = new ApiService();
