@@ -11,6 +11,7 @@ urlpatterns = [
     path('my-sales/', views.MySalesView.as_view(), name='my-sales'),
     
     # Order actions
+    path('<int:order_id>/approve/', views.OrderApprovalView.as_view(), name='order-approval'),
     path('<int:order_id>/ship/', views.mark_order_shipped, name='mark-order-shipped'),
     path('<int:order_id>/deliver/', views.mark_order_delivered, name='mark-order-delivered'),
     path('<int:order_id>/cancel/', views.cancel_order, name='cancel-order'),
@@ -20,6 +21,7 @@ urlpatterns = [
     
     # Order tracking
     path('track/', views.track_order, name='track-order'),
+    path('<int:order_id>/tracking/', views.get_order_tracking, name='get-order-tracking'),
     
     # Order statistics
     path('statistics/', views.order_statistics, name='order-statistics'),
@@ -34,4 +36,4 @@ urlpatterns = [
     # Dispute messages
     path('disputes/<int:dispute_id>/messages/', views.DisputeMessageListView.as_view(), name='dispute-messages'),
     path('disputes/messages/create/', views.DisputeMessageCreateView.as_view(), name='dispute-message-create'),
-] 
+]

@@ -6,13 +6,15 @@ from products.models import Product, Offer
 class Order(models.Model):
     """Order model for completed purchases"""
     STATUS_CHOICES = [
-        ('pending', 'Pending'),
+        ('pending', 'Pending Seller Approval'),
+        ('approved', 'Approved by Seller'),
         ('confirmed', 'Confirmed'),
         ('processing', 'Processing'),
         ('shipped', 'Shipped'),
         ('delivered', 'Delivered'),
         ('cancelled', 'Cancelled'),
         ('refunded', 'Refunded'),
+        ('rejected', 'Rejected by Seller'),
     ]
     
     PAYMENT_STATUS_CHOICES = [

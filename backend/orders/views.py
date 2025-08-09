@@ -4,6 +4,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.db.models import Q, Count, Sum
 from django.shortcuts import get_object_or_404
+from django.db import models
 from .models import Order, OrderStatus, ShippingMethod, Dispute, DisputeMessage
 from .serializers import (
     OrderListSerializer, OrderDetailSerializer, OrderCreateSerializer,
@@ -45,14 +46,27 @@ class OrderCreateView(generics.CreateAPIView):
     def perform_create(self, serializer):
         order = serializer.save()
         
+        # Do NOT change product status when order is created - keep it available until approved
+        # This allows other buyers to still see and potentially purchase the product
+        # until the seller approves this specific order
+        
         # Create initial status
         OrderStatus.objects.create(
             order=order,
             status='pending',
-            notes='Order created'
+            notes='Order created, awaiting seller approval'
         )
         
-        # Update product status if order was created from an accepted offer
+        # Create notification for seller
+        from chat.models import Notification
+        Notification.objects.create(
+            recipient=order.seller,
+            title=f'New Order #{order.order_number}',
+            message=f'You have a new order for "{order.product.title}" from {order.buyer.username}. Please review and approve.',
+            notification_type='order_created'
+        )
+        
+        # Update product status only if order was created from an accepted offer
         if order.accepted_offer:
             order.product.status = 'sold'
             order.product.save()
@@ -331,3 +345,108 @@ def recent_orders(request):
             recent_seller_orders, many=True, context={'request': request}
         ).data,
     })
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def get_order_tracking(request, order_id):
+    """Get order tracking details by order ID"""
+    user = request.user
+    order = get_object_or_404(Order, pk=order_id)
+    
+    # Check if user has permission to view this order
+    if order.buyer != user and order.seller != user:
+        return Response(
+            {'error': 'You do not have permission to view this order'}, 
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    # Return detailed tracking info
+    return Response({
+        'order_id': order.id,
+        'order_number': order.order_number,
+        'status': order.status,
+        'tracking_number': order.tracking_number,
+        'shipping_method': order.shipping_method.name if order.shipping_method else None,
+        'created_at': order.created_at,
+        'shipped_at': order.shipped_at,
+        'delivered_at': order.delivered_at,
+        'estimated_delivery': order.estimated_delivery,
+        'buyer': {
+            'id': order.buyer.id,
+            'username': order.buyer.username,
+            'full_name': order.buyer.get_full_name(),
+        },
+        'seller': {
+            'id': order.seller.id,
+            'username': order.seller.username,
+            'full_name': order.seller.get_full_name(),
+        },
+        'total_amount': order.total_amount,
+        'status_history': OrderStatusSerializer(
+            order.status_history.all().order_by('created_at'), many=True
+        ).data,
+        'items': [{
+            'product_title': order.product.title,
+            'product_id': order.product.id,
+            'quantity': order.quantity,
+            'price': order.price,
+        }]
+    })
+
+
+class OrderApprovalView(APIView):
+    """Approve or reject an order (seller only)"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def post(self, request, order_id):
+        try:
+            order = Order.objects.get(id=order_id, seller=request.user)
+        except Order.DoesNotExist:
+            return Response({'error': 'Order not found or you are not authorized to modify this order'}, 
+                          status=status.HTTP_404_NOT_FOUND)
+        
+        action = request.data.get('action')
+        if action not in ['approve', 'reject']:
+            return Response({'error': 'Invalid action. Must be "approve" or "reject"'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+        
+        if order.status != 'pending':
+            return Response({'error': 'Order is not in pending status'}, 
+                          status=status.HTTP_400_BAD_REQUEST)
+        
+        if action == 'approve':
+            order.status = 'approved'
+            status_note = 'Order approved by seller'
+            # Set product as sold when order is approved
+            order.product.status = 'sold'
+            order.product.save()
+        else:
+            order.status = 'rejected'
+            status_note = 'Order rejected by seller'
+            # Keep product available when order is rejected
+            # (product status remains unchanged - available for other buyers)
+        
+        order.save()
+        
+        # Create status history
+        OrderStatus.objects.create(
+            order=order,
+            status=order.status,
+            notes=status_note
+        )
+        
+        # Create notification for buyer
+        from chat.models import Notification
+        Notification.objects.create(
+            recipient=order.buyer,
+            title=f'Order #{order.order_number} {action}d',
+            message=f'Your order for "{order.product.title}" has been {action}d by the seller.',
+            notification_type=f'order_{action}d'
+        )
+        
+        return Response({
+            'success': True, 
+            'order_status': order.status,
+            'message': f'Order {action}d successfully'
+        })

@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from . import admin_views
 
 urlpatterns = [
     # Authentication
@@ -14,6 +15,7 @@ urlpatterns = [
     
     # Seller verification
     path('verify-seller/', views.SellerVerificationView.as_view(), name='verify-seller'),
+    path('verification-status/', views.VerificationStatusView.as_view(), name='verification-status'),
     
     # User ratings
     path('ratings/create/', views.UserRatingCreateView.as_view(), name='create-rating'),
@@ -25,4 +27,9 @@ urlpatterns = [
     # Dashboards
     path('dashboard/', views.user_dashboard, name='user-dashboard'),
     path('seller-dashboard/', views.seller_dashboard, name='seller-dashboard'),
-] 
+
+    # Admin endpoints (staff only)
+    path('admin/stats/', admin_views.admin_stats, name='admin-stats'),
+    path('admin/activities/', admin_views.admin_activities, name='admin-activities'),
+    path('admin/system-health/', admin_views.system_health, name='system-health'),
+]

@@ -82,6 +82,10 @@ class Product(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
     expires_at = models.DateTimeField(blank=True, null=True)
     
+    # Ratings
+    average_rating = models.DecimalField(max_digits=3, decimal_places=2, default=0.00)
+    total_ratings = models.PositiveIntegerField(default=0)
+    
     class Meta:
         db_table = 'products'
         ordering = ['-created_at']
@@ -103,6 +107,19 @@ class Product(models.Model):
     
     def is_available(self):
         return self.status == 'active' and self.is_active
+    
+    def update_rating(self):
+        """Update product average rating based on all ratings"""
+        from django.db.models import Avg
+        ratings = self.ratings.all()
+        if ratings.exists():
+            avg_rating = ratings.aggregate(Avg('rating'))['rating__avg']
+            self.average_rating = round(avg_rating, 1) if avg_rating else 0
+            self.total_ratings = ratings.count()
+        else:
+            self.average_rating = 0
+            self.total_ratings = 0
+        self.save(update_fields=['average_rating', 'total_ratings'])
 
 
 class ProductImage(models.Model):
@@ -200,3 +217,34 @@ class Favorite(models.Model):
         self.product.favorites_count = max(0, self.product.favorites_count - 1)
         self.product.save(update_fields=['favorites_count'])
         super().delete(*args, **kwargs)
+
+
+class ProductRating(models.Model):
+    """Product ratings and reviews"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='product_ratings')
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='ratings')
+    rating = models.IntegerField(validators=[MinValueValidator(1), MaxValueValidator(5)])
+    review = models.TextField(blank=True, null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        unique_together = ('user', 'product')
+        db_table = 'product_ratings'
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.user.username} rated {self.product.title} - {self.rating} stars"
+    
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        super().save(*args, **kwargs)
+        
+        if is_new:
+            # Update product average rating
+            self.product.update_rating()
+    
+    def delete(self, *args, **kwargs):
+        super().delete(*args, **kwargs)
+        # Update product average rating
+        self.product.update_rating()

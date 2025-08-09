@@ -128,8 +128,38 @@ class OfferCreateView(generics.CreateAPIView):
     serializer_class = OfferSerializer
     permission_classes = [permissions.IsAuthenticated]
     
+    def create(self, request, *args, **kwargs):
+        # Add debug logging
+        print(f"Offer creation request data: {request.data}")
+        try:
+            return super().create(request, *args, **kwargs)
+        except Exception as e:
+            print(f"Error creating offer: {str(e)}")
+            raise
+    
     def perform_create(self, serializer):
-        serializer.save(buyer=self.request.user)
+        offer = serializer.save(buyer=self.request.user)
+        
+        # Add debug logging
+        print(f"Creating offer: {offer.id} for product: {offer.product.title}")
+        print(f"Buyer: {offer.buyer.username}, Seller: {offer.product.seller.username}")
+        
+        # Create notification for seller
+        from chat.models import Notification
+        notification = Notification.objects.create(
+            recipient=offer.product.seller,
+            sender=self.request.user,
+            notification_type='offer',
+            title=f'New offer for {offer.product.title}',
+            message=f'{self.request.user.username} made an offer of ${offer.amount} for your product',
+            related_product=offer.product
+        )
+        
+        print(f"Created notification: {notification.id} for user: {notification.recipient.username}")
+        print(f"Notification type: {notification.notification_type}")
+        print(f"Total notifications for user: {Notification.objects.filter(recipient=offer.product.seller).count()}")
+        
+        return offer
 
 
 class OfferListView(generics.ListAPIView):
@@ -188,6 +218,18 @@ def accept_offer(request, offer_id):
         )
     
     offer.accept()
+    
+    # Create notification for buyer
+    from chat.models import Notification
+    Notification.objects.create(
+        recipient=offer.buyer,
+        sender=request.user,
+        notification_type='offer_accepted',
+        title=f'Your offer was accepted!',
+        message=f'Your offer of ${offer.amount} for "{offer.product.title}" has been accepted',
+        related_product=offer.product
+    )
+    
     return Response({'message': 'Offer accepted successfully'})
 
 
@@ -210,7 +252,58 @@ def reject_offer(request, offer_id):
         )
     
     offer.reject()
+    
+    # Create notification for buyer
+    from chat.models import Notification
+    Notification.objects.create(
+        recipient=offer.buyer,
+        sender=request.user,
+        notification_type='offer_rejected',
+        title=f'Your offer was rejected',
+        message=f'Your offer of ${offer.amount} for "{offer.product.title}" has been rejected',
+        related_product=offer.product
+    )
+    
     return Response({'message': 'Offer rejected successfully'})
+    
+    if offer.product.seller != request.user:
+        return Response(
+            {'error': 'You can only reject offers for your own products'}, 
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    if offer.status != 'pending':
+        return Response(
+            {'error': 'Offer is not pending'}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    offer.reject()
+    return Response({'message': 'Offer rejected successfully'})
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def cancel_offer(request, offer_id):
+    """Cancel an offer (buyer only)"""
+    offer = get_object_or_404(Offer, id=offer_id)
+    
+    if offer.buyer != request.user:
+        return Response(
+            {'error': 'You can only cancel your own offers'}, 
+            status=status.HTTP_403_FORBIDDEN
+        )
+    
+    if offer.status != 'pending':
+        return Response(
+            {'error': 'Offer is not pending'}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+    
+    # Mark offer as cancelled or delete it
+    offer.delete()  # or offer.status = 'cancelled'; offer.save()
+    
+    return Response({'message': 'Offer cancelled successfully'})
 
 
 class FavoriteCreateView(generics.CreateAPIView):
@@ -328,12 +421,7 @@ def search_products(request):
         elif sort_by == 'popular':
             queryset = queryset.order_by('-views_count')
         
-        # Paginate results
-        page = self.paginate_queryset(queryset)
-        if page is not None:
-            serializer = ProductListSerializer(page, many=True, context={'request': request})
-            return self.get_paginated_response(serializer.data)
-        
+        # Return results
         serializer = ProductListSerializer(queryset, many=True, context={'request': request})
         return Response(serializer.data)
     
@@ -384,3 +472,109 @@ def category_products(request, category_id):
     
     serializer = ProductListSerializer(products, many=True, context={'request': request})
     return Response(serializer.data)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def create_product_rating(request, product_id):
+    """Create a rating for a product"""
+    try:
+        product = Product.objects.get(id=product_id)
+        
+        # Check if user is trying to rate their own product
+        if product.seller == request.user:
+            return Response(
+                {'error': 'You cannot rate your own product'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if user has already rated this product
+        from .models import ProductRating
+        existing_rating = ProductRating.objects.filter(
+            user=request.user,
+            product=product
+        ).first()
+        
+        if existing_rating:
+            # Update existing rating
+            existing_rating.rating = request.data.get('rating')
+            existing_rating.review = request.data.get('review', '')
+            existing_rating.save()
+            
+            # Update product's average rating
+            product.update_rating()
+            
+            return Response({
+                'message': 'Rating updated successfully',
+                'rating': {
+                    'id': existing_rating.id,
+                    'rating': existing_rating.rating,
+                    'review': existing_rating.review
+                }
+            })
+        else:
+            # Create new rating
+            rating = ProductRating.objects.create(
+                user=request.user,
+                product=product,
+                rating=request.data.get('rating'),
+                review=request.data.get('review', '')
+            )
+            
+            # Update product's average rating
+            product.update_rating()
+            
+            return Response({
+                'message': 'Rating created successfully',
+                'rating': {
+                    'id': rating.id,
+                    'rating': rating.rating,
+                    'review': rating.review
+                }
+            })
+            
+    except Product.DoesNotExist:
+        return Response(
+            {'error': 'Product not found'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {'error': str(e)}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+
+@api_view(['GET'])
+def get_product_ratings(request, product_id):
+    """Get all ratings for a product"""
+    try:
+        product = Product.objects.get(id=product_id)
+        from .models import ProductRating
+        ratings = ProductRating.objects.filter(product=product).order_by('-created_at')
+        
+        ratings_data = []
+        for rating in ratings:
+            ratings_data.append({
+                'id': rating.id,
+                'user': rating.user.username,
+                'user_image': rating.user.profile_image.url if rating.user.profile_image else None,
+                'rating': rating.rating,
+                'review': rating.review,
+                'created_at': rating.created_at.isoformat()
+            })
+        
+        return Response({
+            'results': ratings_data,
+            'average_rating': product.average_rating,
+            'total_ratings': product.total_ratings
+        })
+        
+    except Product.DoesNotExist:
+        return Response(
+            {'error': 'Product not found'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+
+# ...existing code...

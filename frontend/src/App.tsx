@@ -16,6 +16,12 @@ import DashboardPage from './pages/DashboardPage';
 import ChatPage from './pages/ChatPage';
 import OrdersPage from './pages/OrdersPage';
 import FavoritesPage from './pages/FavoritesPage';
+import AdminDashboardPage from './pages/AdminDashboardPage';
+import NotificationsPage from './pages/NotificationsPage';
+import SellerVerificationPage from './pages/SellerVerificationPage';
+import OrderTrackingPage from './pages/OrderTrackingPage';
+import OrderDetailPage from './pages/OrderDetailPage';
+import CheckoutPage from './pages/CheckoutPage';
 
 // Components
 import Navbar from './components/layout/Navbar';
@@ -123,10 +129,66 @@ const App: React.FC = () => {
                     }
                   />
                   <Route
+                    path="/orders/:id"
+                    element={
+                      <ProtectedRoute>
+                        <OrderDetailPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
                     path="/favorites"
                     element={
                       <ProtectedRoute>
                         <FavoritesPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin-dashboard"
+                    element={
+                      <ProtectedRoute>
+                        <AdminDashboardPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/notifications"
+                    element={
+                      <ProtectedRoute>
+                        <NotificationsPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/verify-seller"
+                    element={
+                      <ProtectedRoute>
+                        <SellerVerificationPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/order-tracking/:orderId"
+                    element={
+                      <ProtectedRoute>
+                        <OrderTrackingPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/checkout"
+                    element={
+                      <ProtectedRoute>
+                        <CheckoutPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/orders/:orderId/tracking"
+                    element={
+                      <ProtectedRoute>
+                        <OrderTrackingPage />
                       </ProtectedRoute>
                     }
                   />

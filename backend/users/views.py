@@ -104,6 +104,25 @@ class SellerVerificationView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
+class VerificationStatusView(APIView):
+    """Get seller verification status"""
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get(self, request):
+        user = request.user
+        return Response({
+            'is_verified': user.is_verified,
+            'verification_status': getattr(user, 'verification_status', 'not_submitted'),
+            'verification_date': getattr(user, 'verification_date', None),
+            'rejection_reason': getattr(user, 'rejection_reason', None),
+            'documents_required': [
+                'government_id',
+                'proof_of_address',
+                'business_registration'  # if business seller
+            ]
+        })
+
+
 class UserRatingCreateView(generics.CreateAPIView):
     """Create a user rating"""
     serializer_class = UserRatingSerializer

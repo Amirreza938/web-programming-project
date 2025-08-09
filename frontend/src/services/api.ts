@@ -118,20 +118,77 @@ export interface Message {
 
 export interface Order {
   id: number;
-  product: number;
-  product_title: string;
-  product_image?: string;
-  buyer: number;
-  buyer_name: string;
-  seller: number;
-  seller_name: string;
-  quantity: number;
+  order_number: string;
+  product: any; // This should be a product object from ProductListSerializer
+  seller: {
+    id: number;
+    username: string;
+    email: string;
+    first_name: string;
+    last_name: string;
+    full_name: string;
+    user_type: string;
+    phone_number?: string;
+    address?: string;
+    city?: string;
+    country?: string;
+    postal_code?: string;
+    profile_image?: string;
+    average_rating: number;
+    total_ratings: number;
+    verification_status: string;
+    is_active_seller: boolean;
+    is_verified_seller: boolean;
+    is_premium: boolean;
+    created_at: string;
+  };
+  buyer: {
+    id: number;
+    username: string;
+    email: string;
+    first_name: string;
+    last_name: string;
+    full_name: string;
+    user_type: string;
+    phone_number?: string;
+    address?: string;
+    city?: string;
+    country?: string;
+    postal_code?: string;
+    profile_image?: string;
+    average_rating: number;
+    total_ratings: number;
+    verification_status: string;
+    is_active_seller: boolean;
+    is_verified_seller: boolean;
+    is_premium: boolean;
+    created_at: string;
+  };
+  accepted_offer?: number;
+  unit_price: number;
+  shipping_cost: number;
   total_amount: number;
-  shipping_address?: string;
+  shipping_address: string;
+  shipping_city: string;
+  shipping_country: string;
+  shipping_postal_code: string;
+  shipping_phone: string;
+  shipping_method: string;
+  tracking_number?: string;
   status: string;
-  conversation_id?: number;
+  payment_status: string;
+  status_history?: any[];
   created_at: string;
   updated_at: string;
+  shipped_at?: string;
+  delivered_at?: string;
+  // Legacy fields for backward compatibility
+  product_title?: string;
+  product_image?: string;
+  buyer_name?: string;
+  seller_name?: string;
+  quantity?: number;
+  conversation_id?: number;
 }
 
 export interface DashboardData {
@@ -321,8 +378,33 @@ class ApiService {
 
   // Offer endpoints
   async createOffer(productId: number, offerData: { amount: number; message?: string }): Promise<Offer> {
-    const response = await this.api.post('/products/offers/create/', { ...offerData, product: productId });
-    return response.data;
+    const payload = { ...offerData, product: productId };
+    console.log('Creating offer with payload:', payload);
+    try {
+      const response = await this.api.post('/products/offers/create/', payload);
+      return response.data;
+    } catch (error: any) {
+      console.error('Offer creation error:', error.response?.data || error.message);
+      
+      // Check if it's a duplicate offer error
+      if (error.response?.data?.non_field_errors?.some((err: any) => 
+        err.toString().includes('already have a pending offer'))) {
+        // Get user's existing offers to show them
+        try {
+          const existingOffers = await this.getMyOffers();
+          const productOffer = existingOffers.find(offer => offer.product === productId && offer.status === 'pending');
+          if (productOffer) {
+            const enhancedError = new Error('You already have a pending offer for this product');
+            (enhancedError as any).existingOffer = productOffer;
+            throw enhancedError;
+          }
+        } catch (offersError) {
+          console.error('Error fetching existing offers:', offersError);
+        }
+      }
+      
+      throw error;
+    }
   }
 
   async getProductOffers(productId: number): Promise<Offer[]> {
@@ -330,12 +412,26 @@ class ApiService {
     return response.data.results;
   }
 
+  async getMyOffers(): Promise<Offer[]> {
+    const response = await this.api.get('/products/offers/my-offers/');
+    return response.data.results || response.data;
+  }
+
+  async getOffer(offerId: number): Promise<Offer> {
+    const response = await this.api.get(`/products/offers/${offerId}/`);
+    return response.data;
+  }
+
   async acceptOffer(offerId: number): Promise<void> {
-    await this.api.post(`/offers/${offerId}/accept/`);
+    await this.api.post(`/products/offers/${offerId}/accept/`);
   }
 
   async rejectOffer(offerId: number): Promise<void> {
-    await this.api.post(`/offers/${offerId}/reject/`);
+    await this.api.post(`/products/offers/${offerId}/reject/`);
+  }
+
+  async cancelOffer(offerId: number): Promise<void> {
+    await this.api.post(`/products/offers/${offerId}/cancel/`);
   }
 
   // Favorite endpoints
@@ -361,7 +457,12 @@ class ApiService {
   // Chat endpoints
   async getConversations(): Promise<Conversation[]> {
     const response = await this.api.get('/chat/conversations/');
-    return response.data.results;
+    return response.data.results || response.data;
+  }
+
+  async getDirectConversations(): Promise<Conversation[]> {
+    const response = await this.api.get('/chat/direct-conversations/');
+    return response.data.results || response.data;
   }
 
   async getConversation(conversationId: number): Promise<Conversation> {
@@ -369,41 +470,56 @@ class ApiService {
     return response.data;
   }
 
-  async createConversation(productId: number): Promise<{ conversation_id: number }> {
-    const response = await this.api.post(`/chat/start-conversation/${productId}/`);
-    return response.data;
-  }
-
-  async deleteConversation(conversationId: number): Promise<void> {
-    await this.api.delete(`/chat/conversations/${conversationId}/`);
-  }
-
-  async getMessages(conversationId: number): Promise<Message[]> {
+  async getConversationMessages(conversationId: number): Promise<Message[]> {
     const response = await this.api.get(`/chat/conversations/${conversationId}/messages/`);
-    return response.data.results;
+    return response.data.results || response.data;
   }
 
-  async sendMessage(conversationId: number, message: string): Promise<Message> {
-    // The backend only allows POST to /chat/messages/create/ with conversation and content
-    const response = await this.api.post(`/chat/messages/create/`, {
+  async getDirectConversationMessages(conversationId: number): Promise<Message[]> {
+    const response = await this.api.get(`/chat/direct-conversations/${conversationId}/messages/`);
+    return response.data.results || response.data;
+  }
+
+  async sendMessage(conversationId: number, content: string): Promise<Message> {
+    const response = await this.api.post('/chat/messages/create/', {
       conversation: conversationId,
-      content: message,
+      content: content
     });
     return response.data;
   }
 
-  async getNotifications(): Promise<any[]> {
-    const response = await this.api.get('/chat/notifications/');
-    return response.data.results;
+  async sendDirectMessage(conversationId: number, content: string): Promise<Message> {
+    const response = await this.api.post('/chat/direct-messages/create/', {
+      conversation: conversationId,
+      content: content
+    });
+    return response.data;
   }
 
-  async markNotificationAsRead(notificationId: number): Promise<void> {
-    await this.api.post(`/chat/notifications/${notificationId}/read/`);
+  async startDirectConversation(userId: number, message?: string): Promise<{ conversation_id: number }> {
+    const response = await this.api.post(`/chat/start-direct-conversation/${userId}/`, {
+      message: message
+    });
+    return response.data;
   }
 
-  async getUnreadCount(): Promise<number> {
-    const response = await this.api.get('/chat/unread-count/');
-    return response.data.unread_count;
+  async startConversation(productId: number, message: string): Promise<any> {
+    const response = await this.api.post(`/chat/start-conversation/${productId}/`, {
+      message: message
+    });
+    return response.data;
+  }
+
+  async createConversation(productId: number): Promise<any> {
+    const response = await this.api.post(`/chat/start-conversation/${productId}/`, {
+      message: 'Hi, I\'m interested in this product.'
+    });
+    return response.data;
+  }
+
+  async getUnreadCounts(): Promise<any> {
+    const response = await this.api.get('/chat/unread-counts/');
+    return response.data;
   }
 
   // Order endpoints
@@ -428,7 +544,7 @@ class ApiService {
   }
 
   async createOrder(orderData: any): Promise<Order> {
-    const response = await this.api.post('/orders/', orderData);
+    const response = await this.api.post('/orders/create/', orderData);
     return response.data;
   }
 
@@ -459,6 +575,11 @@ class ApiService {
   }
 
   async trackOrder(orderId: number): Promise<any> {
+    const response = await this.api.get(`/orders/${orderId}/tracking/`);
+    return response.data;
+  }
+
+  async getOrderTracking(orderId: number): Promise<any> {
     const response = await this.api.get(`/orders/${orderId}/tracking/`);
     return response.data;
   }
@@ -498,6 +619,72 @@ class ApiService {
       content: message,
     });
     return response.data;
+  }
+
+  // Admin APIs
+  async getAdminStats(period: string = 'week'): Promise<any> {
+    const response = await this.api.get(`/users/admin/stats/?period=${period}`);
+    return response.data;
+  }
+
+  async getAdminActivities(): Promise<any> {
+    const response = await this.api.get('/users/admin/activities/');
+    return response.data;
+  }
+
+  async getSystemHealth(): Promise<any> {
+    const response = await this.api.get('/users/admin/system-health/');
+    return response.data;
+  }
+
+  // Notifications
+  async getNotifications(): Promise<any[]> {
+    const response = await this.api.get('/chat/notifications/');
+    return response.data.results || response.data;
+  }
+
+  async markNotificationRead(notificationId: number): Promise<void> {
+    await this.api.post(`/chat/notifications/${notificationId}/read/`);
+  }
+
+  async markAllNotificationsRead(): Promise<void> {
+    await this.api.post('/chat/notifications/read-all/');
+  }
+
+  async deleteNotification(notificationId: number): Promise<void> {
+    await this.api.delete(`/chat/notifications/${notificationId}/`);
+  }
+
+  // Seller Verification
+  async getVerificationStatus(): Promise<any> {
+    const response = await this.api.get('/users/verification-status/');
+    return response.data;
+  }
+
+  async submitVerification(formData: FormData): Promise<any> {
+    const response = await this.api.post('/users/verify-seller/', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' }
+    });
+    return response.data;
+  }
+
+  // Product rating endpoints
+  async createProductRating(productId: number, ratingData: { rating: number; review?: string }): Promise<void> {
+    await this.api.post(`/products/${productId}/rate/`, ratingData);
+  }
+
+  async getProductRatings(productId: number): Promise<any[]> {
+    const response = await this.api.get(`/products/${productId}/ratings/`);
+    return response.data.results;
+  }
+
+  // Order approval endpoints
+  async approveOrder(orderId: number): Promise<void> {
+    await this.api.post(`/orders/${orderId}/approve/`, { action: 'approve' });
+  }
+
+  async rejectOrder(orderId: number): Promise<void> {
+    await this.api.post(`/orders/${orderId}/approve/`, { action: 'reject' });
   }
 }
 

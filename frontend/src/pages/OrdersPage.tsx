@@ -36,11 +36,13 @@ import {
   CheckCircleIcon,
 } from '@chakra-ui/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { apiService } from '../services/api';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 
 const OrdersPage: React.FC = () => {
   const toast = useToast();
+  const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isOpen, onOpen, onClose } = useDisclosure();
   const cardBg = useColorModeValue('white', 'gray.700');
@@ -215,7 +217,7 @@ const OrdersPage: React.FC = () => {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => window.location.href = `/orders/${order.id}`}
+                onClick={() => navigate(`/orders/${order.id}`)}
               >
                 View Details
               </Button>
@@ -224,7 +226,7 @@ const OrdersPage: React.FC = () => {
                 size="sm"
                 variant="outline"
                 leftIcon={<ChatIcon />}
-                onClick={() => window.location.href = `/chat?conversation=${order.conversation_id}`}
+                onClick={() => navigate(`/chat?conversation=${order.conversation_id}`)}
               >
                 Message
               </Button>

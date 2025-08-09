@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Conversation, Message, Notification
+from .models import Conversation, Message, Notification, DirectConversation, DirectMessage
 from users.serializers import UserProfileSerializer
 from products.serializers import ProductListSerializer
 
@@ -28,6 +28,30 @@ class MessageSerializer(serializers.ModelSerializer):
         return message
 
 
+class DirectMessageSerializer(serializers.ModelSerializer):
+    """Serializer for direct chat messages"""
+    sender_name = serializers.CharField(source='sender.username', read_only=True)
+    sender_image = serializers.ImageField(source='sender.profile_image', read_only=True)
+    
+    class Meta:
+        model = DirectMessage
+        fields = [
+            'id', 'conversation', 'sender', 'sender_name', 'sender_image',
+            'content', 'is_read', 'created_at'
+        ]
+        read_only_fields = ['id', 'sender', 'sender_name', 'sender_image', 'is_read', 'created_at']
+    
+    def create(self, validated_data):
+        validated_data['sender'] = self.context['request'].user
+        message = DirectMessage.objects.create(**validated_data)
+        
+        # Mark conversation as updated
+        conversation = message.conversation
+        conversation.save()  # This will update the updated_at field
+        
+        return message
+
+
 class ConversationListSerializer(serializers.ModelSerializer):
     """Serializer for listing conversations"""
     other_user = serializers.SerializerMethodField()
@@ -48,8 +72,8 @@ class ConversationListSerializer(serializers.ModelSerializer):
         return {
             'id': other_user.id,
             'username': other_user.username,
-            'profile_image': other_user.profile_image.url if other_user.profile_image else None,
-            'average_rating': float(other_user.average_rating)
+            'full_name': other_user.get_full_name(),
+            'profile_image': other_user.profile_image.url if other_user.profile_image else None
         }
     
     def get_last_message(self, obj):
@@ -57,7 +81,45 @@ class ConversationListSerializer(serializers.ModelSerializer):
         if last_message:
             return {
                 'content': last_message.content,
-                'sender_name': last_message.sender.username,
+                'sender': last_message.sender.username,
+                'created_at': last_message.created_at
+            }
+        return None
+    
+    def get_unread_count(self, obj):
+        current_user = self.context['request'].user
+        return obj.get_unread_count(current_user)
+
+
+class DirectConversationListSerializer(serializers.ModelSerializer):
+    """Serializer for listing direct conversations"""
+    other_user = serializers.SerializerMethodField()
+    last_message = serializers.SerializerMethodField()
+    unread_count = serializers.SerializerMethodField()
+    
+    class Meta:
+        model = DirectConversation
+        fields = [
+            'id', 'other_user', 'last_message', 'unread_count',
+            'is_active', 'created_at', 'updated_at'
+        ]
+    
+    def get_other_user(self, obj):
+        current_user = self.context['request'].user
+        other_user = obj.get_other_user(current_user)
+        return {
+            'id': other_user.id,
+            'username': other_user.username,
+            'full_name': other_user.get_full_name(),
+            'profile_image': other_user.profile_image.url if other_user.profile_image else None
+        }
+    
+    def get_last_message(self, obj):
+        last_message = obj.direct_messages.last()
+        if last_message:
+            return {
+                'content': last_message.content,
+                'sender': last_message.sender.username,
                 'created_at': last_message.created_at
             }
         return None
@@ -146,4 +208,21 @@ class NotificationListSerializer(serializers.ModelSerializer):
 class UnreadCountSerializer(serializers.Serializer):
     """Serializer for unread counts"""
     unread_messages = serializers.IntegerField()
-    unread_notifications = serializers.IntegerField() 
+    unread_notifications = serializers.IntegerField()
+
+
+class DirectConversationDetailSerializer(serializers.ModelSerializer):
+    """Serializer for direct conversation details with messages"""
+    other_user = serializers.SerializerMethodField()
+    messages = DirectMessageSerializer(source='direct_messages', many=True, read_only=True)
+    
+    class Meta:
+        model = DirectConversation
+        fields = [
+            'id', 'other_user', 'messages', 'is_active', 'created_at', 'updated_at'
+        ]
+    
+    def get_other_user(self, obj):
+        current_user = self.context['request'].user
+        other_user = obj.get_other_user(current_user)
+        return UserProfileSerializer(other_user).data

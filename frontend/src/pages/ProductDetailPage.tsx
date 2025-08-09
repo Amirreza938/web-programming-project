@@ -29,6 +29,8 @@ import {
   ModalBody,
   ModalCloseButton,
   useDisclosure,
+  Alert,
+  AlertIcon,
 } from '@chakra-ui/react';
 import {
   StarIcon,
@@ -41,6 +43,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import LoadingSpinner from '../components/common/LoadingSpinner';
+import ProductRatingModal from '../components/ProductRatingModal';
 
 const ProductDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -49,6 +52,11 @@ const ProductDetailPage: React.FC = () => {
   const toast = useToast();
   const queryClient = useQueryClient();
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const { 
+    isOpen: isRatingOpen, 
+    onOpen: onRatingOpen, 
+    onClose: onRatingClose 
+  } = useDisclosure();
   
   const bg = useColorModeValue('white', 'gray.800');
   const cardBg = useColorModeValue('white', 'gray.700');
@@ -311,10 +319,50 @@ const ProductDetailPage: React.FC = () => {
               {/* Action Buttons */}
               {!isOwner && (
                 <VStack spacing={4}>
+                  {product.status === 'sold' ? (
+                    <Alert status="error" borderRadius="md">
+                      <AlertIcon />
+                      <VStack align="start" spacing={1}>
+                        <Text fontWeight="semibold">This product has been sold</Text>
+                        <Text fontSize="sm">This item is no longer available for purchase.</Text>
+                      </VStack>
+                    </Alert>
+                  ) : product.status === 'inactive' ? (
+                    <Alert status="info" borderRadius="md">
+                      <AlertIcon />
+                      <VStack align="start" spacing={1}>
+                        <Text fontWeight="semibold">Currently Unavailable</Text>
+                        <Text fontSize="sm">This product is temporarily unavailable.</Text>
+                      </VStack>
+                    </Alert>
+                  ) : (
+                    <>
+                      <HStack spacing={4} w="full">
+                        <Button
+                          colorScheme="green"
+                          size="lg"
+                          flex={1}
+                          onClick={() => navigate(`/checkout?product=${id}`)}
+                        >
+                          Buy Now - ${product.price}
+                        </Button>
+                        <IconButton
+                          size="lg"
+                          aria-label="Add to favorites"
+                          icon={<StarIcon />}
+                          colorScheme={product.is_favorited ? 'red' : 'gray'}
+                          variant={product.is_favorited ? 'solid' : 'outline'}
+                          onClick={handleFavorite}
+                          isLoading={favoriteMutation.isPending}
+                        />
+                      </HStack>
+                    </>
+                  )}
+                  
                   <HStack spacing={4} w="full">
                     <Button
                       colorScheme="brand"
-                      size="lg"
+                      size="md"
                       flex={1}
                       onClick={handleChat}
                       leftIcon={<ChatIcon />}
@@ -322,27 +370,28 @@ const ProductDetailPage: React.FC = () => {
                     >
                       Chat with Seller
                     </Button>
-                    <IconButton
-                      size="lg"
-                      aria-label="Add to favorites"
-                      icon={<StarIcon />}
-                      colorScheme={product.is_favorited ? 'red' : 'gray'}
-                      variant={product.is_favorited ? 'solid' : 'outline'}
-                      onClick={handleFavorite}
-                      isLoading={favoriteMutation.isPending}
-                    />
+                    
+                    {product.is_negotiable && (
+                      <Button
+                        variant="outline"
+                        size="md"
+                        flex={1}
+                        onClick={onOpen}
+                      >
+                        Make an Offer
+                      </Button>
+                    )}
                   </HStack>
                   
-                  {product.is_negotiable && (
-                    <Button
-                      variant="outline"
-                      size="lg"
-                      w="full"
-                      onClick={onOpen}
-                    >
-                      Make an Offer
-                    </Button>
-                  )}
+                  <Button
+                    variant="outline"
+                    size="md"
+                    w="full"
+                    onClick={onRatingOpen}
+                    leftIcon={<StarIcon />}
+                  >
+                    Rate This Product
+                  </Button>
                 </VStack>
               )}
 
@@ -452,6 +501,14 @@ const ProductDetailPage: React.FC = () => {
             </ModalBody>
           </ModalContent>
         </Modal>
+
+        {/* Product Rating Modal */}
+        <ProductRatingModal
+          isOpen={isRatingOpen}
+          onClose={onRatingClose}
+          productId={product.id}
+          productTitle={product.title}
+        />
       </Container>
     </Box>
   );

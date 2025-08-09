@@ -24,12 +24,17 @@ urlpatterns = [
     path('<int:product_id>/offers/', views.OfferListView.as_view(), name='product-offers'),
     path('offers/<int:offer_id>/accept/', views.accept_offer, name='accept-offer'),
     path('offers/<int:offer_id>/reject/', views.reject_offer, name='reject-offer'),
+    path('offers/<int:offer_id>/cancel/', views.cancel_offer, name='cancel-offer'),
     
     # Favorites
     path('favorites/', views.FavoriteListView.as_view(), name='favorite-list'),
     path('favorites/add/', views.FavoriteCreateView.as_view(), name='add-favorite'),
     path('favorites/<int:product_id>/remove/', views.remove_favorite, name='remove-favorite'),
     path('<int:product_id>/toggle-favorite/', views.toggle_favorite, name='toggle-favorite'),
+    
+    # Ratings
+    path('<int:product_id>/rate/', views.create_product_rating, name='create-product-rating'),
+    path('<int:product_id>/ratings/', views.get_product_ratings, name='get-product-ratings'),
     
     # Search and discovery
     path('search/', views.search_products, name='search-products'),

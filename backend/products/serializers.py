@@ -64,13 +64,17 @@ class ProductListSerializer(serializers.ModelSerializer):
             if main_image.image_url:
                 return main_image.image_url
             elif main_image.image:
-                return self.context['request'].build_absolute_uri(main_image.image.url)
+                request = self.context.get('request')
+                if request:
+                    return request.build_absolute_uri(main_image.image.url)
+                else:
+                    return main_image.image.url
         return None
     
     def get_is_favorited(self, obj):
-        user = self.context['request'].user
-        if user.is_authenticated:
-            return obj.favorited_by.filter(user=user).exists()
+        request = self.context.get('request')
+        if request and request.user.is_authenticated:
+            return obj.favorited_by.filter(user=request.user).exists()
         return False
 
 
