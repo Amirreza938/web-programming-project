@@ -5,15 +5,17 @@ from django.core.validators import MinValueValidator, MaxValueValidator
 
 class User(AbstractUser):
     USER_TYPE_CHOICES = [
+        ('admin', 'Admin'),
         ('buyer', 'Buyer'),
         ('seller', 'Seller'),
-        ('both', 'Both'),
+        ('both', 'Buyer & Seller'),
     ]
     
     VERIFICATION_STATUS_CHOICES = [
         ('pending', 'Pending'),
         ('verified', 'Verified'),
         ('rejected', 'Rejected'),
+        ('not_required', 'Not Required'),
     ]
     
     # Basic profile fields
@@ -26,12 +28,25 @@ class User(AbstractUser):
     
     # Seller verification
     verification_status = models.CharField(
-        max_length=10, 
+        max_length=15, 
         choices=VERIFICATION_STATUS_CHOICES, 
-        default='pending'
+        default='not_required'
     )
+    id_card_image = models.ImageField(upload_to='id_cards/', blank=True, null=True)
     verification_documents = models.FileField(upload_to='verification_docs/', blank=True, null=True)
     verification_date = models.DateTimeField(blank=True, null=True)
+    verification_notes = models.TextField(blank=True, null=True)
+    
+    # Account approval (for sellers)
+    account_approved = models.BooleanField(default=False)
+    approved_by = models.ForeignKey(
+        'self', 
+        on_delete=models.SET_NULL, 
+        null=True, 
+        blank=True,
+        related_name='approved_users'
+    )
+    approval_date = models.DateTimeField(blank=True, null=True)
     
     # Profile image
     profile_image = models.ImageField(upload_to='profile_images/', blank=True, null=True)
@@ -65,7 +80,47 @@ class User(AbstractUser):
         return f"{self.first_name} {self.last_name}".strip() or self.username
     
     def is_verified_seller(self):
-        return self.verification_status == 'verified' and self.is_active_seller
+        return self.verification_status == 'verified' and self.account_approved
+    
+    def can_buy(self):
+        """Check if user can make purchases"""
+        if self.user_type == 'admin':
+            return False
+        if self.user_type in ['buyer', 'both']:
+            return self.account_approved if self.user_type == 'both' else True
+        return False
+    
+    def can_sell(self):
+        """Check if user can create listings"""
+        if self.user_type == 'admin':
+            return False
+        if self.user_type in ['seller', 'both']:
+            return self.account_approved and self.verification_status == 'verified'
+        return False
+    
+    def is_admin_user(self):
+        """Check if user is the admin"""
+        return self.user_type == 'admin' and self.username == 'Amirreza938938'
+    
+    def needs_verification(self):
+        """Check if user needs ID card verification"""
+        return self.user_type in ['seller', 'both']
+    
+    def save(self, *args, **kwargs):
+        # Set verification status based on user type
+        if self.user_type == 'buyer':
+            self.verification_status = 'not_required'
+            self.account_approved = True
+        elif self.user_type in ['seller', 'both'] and self.verification_status == 'not_required':
+            self.verification_status = 'pending'
+            self.account_approved = False
+        elif self.user_type == 'admin':
+            self.verification_status = 'not_required'
+            self.account_approved = True
+            self.is_staff = True
+            self.is_superuser = True
+        
+        super().save(*args, **kwargs)
     
     def update_average_rating(self, new_rating):
         """Update average rating when a new rating is added"""
@@ -107,3 +162,53 @@ class UserRating(models.Model):
         if is_new:
             # Update the recipient's average rating
             self.to_user.update_average_rating(self.rating)
+
+
+class VerificationRequest(models.Model):
+    """Model for tracking user verification requests"""
+    REQUEST_STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('approved', 'Approved'),
+        ('rejected', 'Rejected'),
+    ]
+    
+    user = models.OneToOneField(
+        User,
+        on_delete=models.CASCADE,
+        related_name='verification_request'
+    )
+    id_card_front = models.ImageField(upload_to='verification/id_cards/front/')
+    id_card_back = models.ImageField(upload_to='verification/id_cards/back/')
+    additional_documents = models.FileField(
+        upload_to='verification/additional/',
+        blank=True,
+        null=True
+    )
+    notes = models.TextField(blank=True, help_text="Additional notes from user")
+    
+    # Admin response
+    status = models.CharField(
+        max_length=10,
+        choices=REQUEST_STATUS_CHOICES,
+        default='pending'
+    )
+    admin_notes = models.TextField(blank=True, help_text="Admin feedback")
+    reviewed_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reviewed_requests'
+    )
+    reviewed_at = models.DateTimeField(blank=True, null=True)
+    
+    # Timestamps
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'verification_requests'
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"Verification request for {self.user.username} - {self.status}"

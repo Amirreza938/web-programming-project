@@ -163,7 +163,7 @@ const ProfilePage: React.FC = () => {
                       <HStack spacing={2} color="gray.600">
                         <CalendarIcon />
                         <Text fontSize="sm">
-                          Member since {new Date(user.date_joined).toLocaleDateString()}
+                          Member since {new Date(user.date_joined || user.created_at).toLocaleDateString()}
                         </Text>
                       </HStack>
                     </VStack>

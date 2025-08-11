@@ -5,14 +5,45 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from django.db.models import Q, Count, Sum
-from .models import User, UserRating
+from django.utils import timezone
+from .models import User, UserRating, VerificationRequest
 from .serializers import (
     UserRegistrationSerializer, UserLoginSerializer, UserProfileSerializer,
     UserUpdateSerializer, UserRatingSerializer, UserRatingListSerializer,
-    SellerVerificationSerializer, ChangePasswordSerializer
+    SellerVerificationSerializer, ChangePasswordSerializer,
+    VerificationRequestSerializer, VerificationRequestUpdateSerializer,
+    AdminDashboardStatsSerializer
 )
 from products.serializers import ProductListSerializer
 from orders.serializers import OrderListSerializer
+
+
+# Custom permission classes
+class IsAdminUser(permissions.BasePermission):
+    """Permission class for admin users only"""
+    def has_permission(self, request, view):
+        return (
+            request.user.is_authenticated and 
+            request.user.is_admin_user()
+        )
+
+
+class CanBuyPermission(permissions.BasePermission):
+    """Permission class for users who can buy"""
+    def has_permission(self, request, view):
+        return (
+            request.user.is_authenticated and 
+            request.user.can_buy()
+        )
+
+
+class CanSellPermission(permissions.BasePermission):
+    """Permission class for users who can sell"""
+    def has_permission(self, request, view):
+        return (
+            request.user.is_authenticated and 
+            request.user.can_sell()
+        )
 
 
 class UserRegistrationView(APIView):
@@ -20,16 +51,30 @@ class UserRegistrationView(APIView):
     permission_classes = [permissions.AllowAny]
     
     def post(self, request):
+        # Debug: Print received data
+        print("Registration request data:")
+        print("request.data:", request.data)
+        print("request.FILES:", request.FILES)
+        print("request.POST:", request.POST)
+        
         serializer = UserRegistrationSerializer(data=request.data)
         if serializer.is_valid():
             user = serializer.save()
             refresh = RefreshToken.for_user(user)
+            
+            # Special message for sellers who need verification
+            message = 'User registered successfully'
+            if user.user_type in ['seller', 'both']:
+                message = 'Registration successful! Your account is pending admin approval. You will be notified once verified.'
+            
             return Response({
-                'message': 'User registered successfully',
+                'message': message,
                 'user': UserProfileSerializer(user).data,
                 'refresh': str(refresh),
                 'access': str(refresh.access_token),
             }, status=status.HTTP_201_CREATED)
+        
+        print("Serializer errors:", serializer.errors)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -42,12 +87,19 @@ class UserLoginView(APIView):
         if serializer.is_valid():
             user = serializer.validated_data['user']
             refresh = RefreshToken.for_user(user)
-            return Response({
+            
+            response_data = {
                 'message': 'Login successful',
                 'user': UserProfileSerializer(user).data,
                 'refresh': str(refresh),
                 'access': str(refresh.access_token),
-            }, status=status.HTTP_200_OK)
+            }
+            
+            # Add redirect info for admin users
+            if user.is_admin_user():
+                response_data['redirect'] = '/admin/dashboard'
+            
+            return Response(response_data, status=status.HTTP_200_OK)
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 
@@ -249,3 +301,156 @@ def seller_dashboard(request):
         'recent_products': ProductListSerializer(recent_products, many=True, context={'request': request}).data,
         'recent_orders': OrderListSerializer(recent_orders, many=True, context={'request': request}).data,
     })
+
+
+# Admin Views
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def admin_dashboard(request):
+    """Get admin dashboard statistics"""
+    stats = {
+        'pending_verifications': VerificationRequest.objects.filter(status='pending').count(),
+        'total_users': User.objects.count() - 1,  # Exclude admin
+        'total_buyers': User.objects.filter(user_type='buyer').count(),
+        'total_sellers': User.objects.filter(user_type__in=['seller', 'both']).count(),
+        'verified_sellers': User.objects.filter(
+            user_type__in=['seller', 'both'], 
+            verification_status='verified'
+        ).count(),
+        'pending_sellers': User.objects.filter(
+            user_type__in=['seller', 'both'], 
+            verification_status='pending'
+        ).count(),
+        'rejected_sellers': User.objects.filter(
+            user_type__in=['seller', 'both'], 
+            verification_status='rejected'
+        ).count(),
+    }
+    
+    return Response(AdminDashboardStatsSerializer(stats).data)
+
+
+class VerificationRequestListView(generics.ListAPIView):
+    """List all verification requests for admin"""
+    serializer_class = VerificationRequestSerializer
+    permission_classes = [IsAdminUser]
+    
+    def get_queryset(self):
+        status_filter = self.request.query_params.get('status', None)
+        queryset = VerificationRequest.objects.all().order_by('-created_at')
+        
+        if status_filter:
+            queryset = queryset.filter(status=status_filter)
+        
+        return queryset
+
+
+class VerificationRequestDetailView(generics.RetrieveUpdateAPIView):
+    """Retrieve and update specific verification request"""
+    queryset = VerificationRequest.objects.all()
+    permission_classes = [IsAdminUser]
+    
+    def get_serializer_class(self):
+        if self.request.method == 'GET':
+            return VerificationRequestSerializer
+        return VerificationRequestUpdateSerializer
+
+
+class PendingUsersListView(generics.ListAPIView):
+    """List all users pending verification"""
+    serializer_class = UserProfileSerializer
+    permission_classes = [IsAdminUser]
+    
+    def get_queryset(self):
+        return User.objects.filter(
+            user_type__in=['seller', 'both'],
+            verification_status='pending'
+        ).order_by('-created_at')
+
+
+@api_view(['POST'])
+@permission_classes([IsAdminUser])
+def approve_user(request, user_id):
+    """Manually approve a user"""
+    try:
+        user = User.objects.get(id=user_id)
+        
+        if user.user_type not in ['seller', 'both']:
+            return Response(
+                {'error': 'Only sellers can be approved'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        user.verification_status = 'verified'
+        user.account_approved = True
+        user.approved_by = request.user
+        user.approval_date = timezone.now()
+        user.save()
+        
+        return Response({
+            'message': f'User {user.username} has been approved',
+            'user': UserProfileSerializer(user).data
+        })
+        
+    except User.DoesNotExist:
+        return Response(
+            {'error': 'User not found'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+
+@api_view(['POST'])
+@permission_classes([IsAdminUser])
+def reject_user(request, user_id):
+    """Reject a user verification"""
+    try:
+        user = User.objects.get(id=user_id)
+        
+        if user.user_type not in ['seller', 'both']:
+            return Response(
+                {'error': 'Only sellers can be rejected'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        user.verification_status = 'rejected'
+        user.account_approved = False
+        user.save()
+        
+        # Update verification request if exists
+        if hasattr(user, 'verification_request'):
+            verification_request = user.verification_request
+            verification_request.status = 'rejected'
+            verification_request.reviewed_by = request.user
+            verification_request.reviewed_at = timezone.now()
+            verification_request.admin_notes = request.data.get('reason', 'Rejected by admin')
+            verification_request.save()
+        
+        return Response({
+            'message': f'User {user.username} has been rejected',
+            'user': UserProfileSerializer(user).data
+        })
+        
+    except User.DoesNotExist:
+        return Response(
+            {'error': 'User not found'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+
+@api_view(['GET'])
+@permission_classes([IsAdminUser])
+def users_list(request):
+    """Get list of all users for admin"""
+    user_type = request.query_params.get('type', None)
+    verification_status = request.query_params.get('verification_status', None)
+    
+    queryset = User.objects.exclude(user_type='admin').order_by('-created_at')
+    
+    if user_type:
+        queryset = queryset.filter(user_type=user_type)
+    
+    if verification_status:
+        queryset = queryset.filter(verification_status=verification_status)
+    
+    users = queryset[:50]  # Limit to 50 users
+    return Response(UserProfileSerializer(users, many=True).data)

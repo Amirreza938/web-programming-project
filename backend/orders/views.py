@@ -12,6 +12,7 @@ from .serializers import (
     DisputeDetailSerializer, DisputeMessageSerializer, DisputeResolutionSerializer,
     OrderTrackingSerializer, ShippingMethodSerializer, OrderStatusSerializer
 )
+from users.views import CanBuyPermission, CanSellPermission
 
 
 class OrderListView(generics.ListAPIView):
@@ -41,9 +42,14 @@ class OrderDetailView(generics.RetrieveAPIView):
 class OrderCreateView(generics.CreateAPIView):
     """Create a new order"""
     serializer_class = OrderCreateSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [CanBuyPermission]
     
     def perform_create(self, serializer):
+        # Check if user can buy
+        if not self.request.user.can_buy():
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("You don't have permission to create orders")
+        
         order = serializer.save()
         
         # Do NOT change product status when order is created - keep it available until approved

@@ -24,8 +24,10 @@ import {
   CheckboxGroup,
   Textarea,
   SimpleGrid,
+  Image,
+  Badge,
 } from '@chakra-ui/react';
-import { ViewIcon, ViewOffIcon } from '@chakra-ui/icons';
+import { ViewIcon, ViewOffIcon, AttachmentIcon } from '@chakra-ui/icons';
 import { useNavigate, Link as RouterLink } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -54,6 +56,8 @@ const RegisterPage: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [idCardFiles, setIdCardFiles] = useState<File[]>([]);
+  const [idCardPreviews, setIdCardPreviews] = useState<string[]>([]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -62,6 +66,29 @@ const RegisterPage: React.FC = () => {
       [name]: value,
     }));
     setError('');
+  };
+
+  const handleIdCardChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files) {
+      const fileArray = Array.from(files);
+      setIdCardFiles(fileArray);
+      
+      // Create previews
+      const previews: string[] = [];
+      fileArray.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          if (e.target?.result) {
+            previews.push(e.target.result as string);
+            if (previews.length === fileArray.length) {
+              setIdCardPreviews(previews);
+            }
+          }
+        };
+        reader.readAsDataURL(file);
+      });
+    }
   };
 
   const validateForm = () => {
@@ -77,6 +104,15 @@ const RegisterPage: React.FC = () => {
       setError('You must agree to the terms and conditions');
       return false;
     }
+    
+    // Check ID card requirement for seller/both
+    if ((formData.userType === 'seller' || formData.userType === 'both')) {
+      if (!idCardFiles || idCardFiles.length < 2) {
+        setError('Please upload both front and back of your ID card for seller accounts');
+        return false;
+      }
+    }
+    
     return true;
   };
 
@@ -91,14 +127,54 @@ const RegisterPage: React.FC = () => {
     setError('');
 
     try {
-      await register(formData);
-      toast({
-        title: 'Registration successful!',
-        description: 'Welcome to SecondHand! Please check your email to verify your account.',
-        status: 'success',
-        duration: 5000,
-        isClosable: true,
-      });
+      // Create FormData for file upload
+      const submitData = new FormData();
+      submitData.append('username', formData.username);
+      submitData.append('email', formData.email);
+      submitData.append('password', formData.password);
+      submitData.append('confirmPassword', formData.confirmPassword);
+      submitData.append('first_name', formData.firstName);
+      submitData.append('last_name', formData.lastName);
+      submitData.append('phone_number', formData.phone);
+      submitData.append('user_type', formData.userType);
+      submitData.append('address', formData.address);
+      submitData.append('city', formData.city);
+      submitData.append('country', formData.country);
+      submitData.append('postal_code', formData.zipCode);
+      
+      // Add ID card files if present (must be exactly 2 files for seller/both)
+      if (idCardFiles && idCardFiles.length >= 2) {
+        console.log('Adding ID card files:', idCardFiles[0], idCardFiles[1]);
+        submitData.append('id_card_front', idCardFiles[0]);
+        submitData.append('id_card_back', idCardFiles[1]);
+      } else if (formData.userType === 'seller' || formData.userType === 'both') {
+        throw new Error('ID card files are required for seller accounts');
+      }
+      
+      // Debug: Check if FormData has files
+      console.log('FormData has id_card_front:', submitData.has('id_card_front'));
+      console.log('FormData has id_card_back:', submitData.has('id_card_back'));
+      
+      await register(submitData);
+      
+      if (formData.userType === 'seller' || formData.userType === 'both') {
+        toast({
+          title: 'Registration successful!',
+          description: 'Your account has been created and is pending admin approval. You will be notified once approved.',
+          status: 'success',
+          duration: 7000,
+          isClosable: true,
+        });
+      } else {
+        toast({
+          title: 'Registration successful!',
+          description: 'Welcome to SecondHand! You can now start browsing and buying products.',
+          status: 'success',
+          duration: 5000,
+          isClosable: true,
+        });
+      }
+      
       navigate('/dashboard');
     } catch (err: any) {
       setError(
@@ -333,6 +409,75 @@ const RegisterPage: React.FC = () => {
                       />
                     </FormControl>
                   </VStack>
+
+                  {/* ID Card Upload - Only for Sellers */}
+                  {(formData.userType === 'seller' || formData.userType === 'both') && (
+                    <VStack spacing={4} w="full">
+                      <Heading as="h3" size="md" alignSelf="flex-start">
+                        Identity Verification
+                        <Badge ml={2} colorScheme="red">Required</Badge>
+                      </Heading>
+                      
+                      <Alert status="info">
+                        <AlertIcon />
+                        <VStack align="start" spacing={1}>
+                          <Text fontSize="sm">
+                            As a seller, you need to upload your ID card for verification.
+                          </Text>
+                          <Text fontSize="sm" color="gray.600">
+                            Your account will be pending admin approval until verification is complete.
+                          </Text>
+                        </VStack>
+                      </Alert>
+
+                      <FormControl isRequired>
+                        <FormLabel>
+                          ID Card Upload
+                          <Text fontSize="sm" color="gray.600" fontWeight="normal">
+                            Upload clear photos of your government-issued ID card (front and back)
+                          </Text>
+                        </FormLabel>
+                        <Input
+                          type="file"
+                          accept="image/*"
+                          multiple
+                          onChange={handleIdCardChange}
+                          display="none"
+                          id="id-card-upload"
+                        />
+                        <Button
+                          as="label"
+                          htmlFor="id-card-upload"
+                          leftIcon={<AttachmentIcon />}
+                          variant="outline"
+                          cursor="pointer"
+                          w="full"
+                        >
+                          {idCardFiles?.length ? `${idCardFiles.length} file(s) selected` : 'Choose ID card images'}
+                        </Button>
+                      </FormControl>
+
+                      {/* ID Card Previews */}
+                      {idCardPreviews.length > 0 && (
+                        <SimpleGrid columns={{ base: 1, md: 2 }} gap={4} w="full">
+                          {idCardPreviews.map((preview, index) => (
+                            <Box key={index} borderWidth={1} borderRadius="md" overflow="hidden">
+                              <Image
+                                src={preview}
+                                alt={`ID Card ${index + 1}`}
+                                maxH="200px"
+                                w="full"
+                                objectFit="cover"
+                              />
+                              <Text fontSize="sm" p={2} textAlign="center" bg="gray.50">
+                                ID Card {index + 1}
+                              </Text>
+                            </Box>
+                          ))}
+                        </SimpleGrid>
+                      )}
+                    </VStack>
+                  )}
 
                   {/* Terms and Conditions */}
                   <VStack spacing={4} w="full">

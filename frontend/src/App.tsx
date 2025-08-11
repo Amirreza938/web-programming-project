@@ -2,7 +2,7 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ChakraProvider, extendTheme } from '@chakra-ui/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { AuthProvider } from './contexts/AuthContext';
 
 // Pages
 import HomePage from './pages/HomePage';
@@ -16,16 +16,19 @@ import DashboardPage from './pages/DashboardPage';
 import ChatPage from './pages/ChatPage';
 import OrdersPage from './pages/OrdersPage';
 import FavoritesPage from './pages/FavoritesPage';
-import AdminDashboardPage from './pages/AdminDashboardPage';
+import AdminDashboard from './pages/AdminDashboard';
 import NotificationsPage from './pages/NotificationsPage';
 import SellerVerificationPage from './pages/SellerVerificationPage';
 import OrderTrackingPage from './pages/OrderTrackingPage';
 import OrderDetailPage from './pages/OrderDetailPage';
 import CheckoutPage from './pages/CheckoutPage';
+import ApprovalPendingPage from './pages/ApprovalPendingPage';
 
 // Components
 import Navbar from './components/layout/Navbar';
 import Footer from './components/layout/Footer';
+import ProtectedRoute from './components/auth/ProtectedRoute';
+import UserStatusMonitor from './components/auth/UserStatusMonitor';
 
 // Create a custom theme
 const theme = extendTheme({
@@ -62,23 +65,13 @@ const queryClient = new QueryClient({
   },
 });
 
-// Protected Route Component
-const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isAuthenticated, isLoading } = useAuth();
-
-  if (isLoading) {
-    return <div>Loading...</div>;
-  }
-
-  return isAuthenticated ? <>{children}</> : <Navigate to="/login" replace />;
-};
-
 const App: React.FC = () => {
   return (
     <ChakraProvider theme={theme}>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <Router>
+            <UserStatusMonitor />
             <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
               <Navbar />
               <main style={{ flex: 1 }}>
@@ -91,7 +84,7 @@ const App: React.FC = () => {
                   <Route
                     path="/create-product"
                     element={
-                      <ProtectedRoute>
+                      <ProtectedRoute requiresApproval allowedRoles={['seller', 'both']}>
                         <CreateProductPage />
                       </ProtectedRoute>
                     }
@@ -123,7 +116,7 @@ const App: React.FC = () => {
                   <Route
                     path="/orders"
                     element={
-                      <ProtectedRoute>
+                      <ProtectedRoute allowedRoles={['buyer', 'both']}>
                         <OrdersPage />
                       </ProtectedRoute>
                     }
@@ -131,7 +124,7 @@ const App: React.FC = () => {
                   <Route
                     path="/orders/:id"
                     element={
-                      <ProtectedRoute>
+                      <ProtectedRoute allowedRoles={['buyer', 'both']}>
                         <OrderDetailPage />
                       </ProtectedRoute>
                     }
@@ -147,8 +140,8 @@ const App: React.FC = () => {
                   <Route
                     path="/admin-dashboard"
                     element={
-                      <ProtectedRoute>
-                        <AdminDashboardPage />
+                      <ProtectedRoute requiresAdmin>
+                        <AdminDashboard />
                       </ProtectedRoute>
                     }
                   />
@@ -179,8 +172,16 @@ const App: React.FC = () => {
                   <Route
                     path="/checkout"
                     element={
-                      <ProtectedRoute>
+                      <ProtectedRoute allowedRoles={['buyer', 'both']}>
                         <CheckoutPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/approval-pending"
+                    element={
+                      <ProtectedRoute>
+                        <ApprovalPendingPage />
                       </ProtectedRoute>
                     }
                   />

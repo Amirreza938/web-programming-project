@@ -21,22 +21,31 @@ export interface User {
   first_name: string;
   last_name: string;
   full_name: string;
-  user_type: 'buyer' | 'seller';
-  phone?: string;
+  user_type: 'admin' | 'buyer' | 'seller' | 'both';
+  phone_number?: string;
+  phone?: string; // Alias for phone_number
   address?: string;
   city?: string;
   state?: string;
-  zip_code?: string;
   country?: string;
-  bio?: string;
+  postal_code?: string;
+  zip_code?: string; // Alias for postal_code
   profile_image?: string;
-  is_verified: boolean;
-  is_active_seller: boolean;
-  is_premium: boolean;
+  bio?: string;
   average_rating: number;
   total_ratings: number;
-  date_joined: string;
-  last_login: string;
+  verification_status: 'pending' | 'verified' | 'rejected' | 'not_required';
+  account_approved: boolean;
+  is_active_seller: boolean;
+  is_verified_seller: boolean;
+  is_verified?: boolean; // Alias for is_verified_seller
+  is_premium: boolean;
+  can_buy: boolean;
+  can_sell: boolean;
+  is_admin_user: boolean;
+  needs_verification: boolean;
+  created_at: string;
+  date_joined?: string; // Alias for created_at
 }
 
 export interface Product {
@@ -201,15 +210,40 @@ export interface DashboardData {
   top_categories?: Array<{ name: string; sales: number }>;
 }
 
+// Admin-specific interfaces
+export interface AdminDashboardStats {
+  pending_verifications: number;
+  total_users: number;
+  total_buyers: number;
+  total_sellers: number;
+  verified_sellers: number;
+  pending_sellers: number;
+  rejected_sellers: number;
+}
+
+export interface VerificationRequest {
+  id: number;
+  user: number;
+  user_details: User;
+  id_card_front: string;
+  id_card_back: string;
+  additional_documents?: string;
+  notes?: string;
+  status: 'pending' | 'approved' | 'rejected';
+  admin_notes?: string;
+  reviewed_by?: number;
+  reviewer_name?: string;
+  reviewed_at?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 class ApiService {
   private api: AxiosInstance;
 
   constructor() {
     this.api = axios.create({
       baseURL: process.env.REACT_APP_API_URL || 'http://localhost:8000/api',
-      headers: {
-        'Content-Type': 'application/json',
-      },
     });
 
     // Request interceptor
@@ -219,6 +253,12 @@ class ApiService {
         if (token) {
           config.headers.Authorization = `Bearer ${token}`;
         }
+        
+        // Only set Content-Type to application/json if it's not FormData
+        if (!(config.data instanceof FormData)) {
+          config.headers['Content-Type'] = 'application/json';
+        }
+        
         return config;
       },
       (error) => {
@@ -637,54 +677,94 @@ class ApiService {
     return response.data;
   }
 
-  // Notifications
+  // Admin endpoints
+  async getAdminDashboard(): Promise<AdminDashboardStats> {
+    const response = await this.api.get('/users/admin/dashboard/');
+    return response.data;
+  }
+
+  async getVerificationRequests(status?: string): Promise<VerificationRequest[]> {
+    const params = status ? { status } : {};
+    const response = await this.api.get('/users/admin/verification-requests/', { params });
+    return response.data.results;
+  }
+
+  async getVerificationRequest(id: number): Promise<VerificationRequest> {
+    const response = await this.api.get(`/users/admin/verification-requests/${id}/`);
+    return response.data;
+  }
+
+  async updateVerificationRequest(id: number, data: { status: string; admin_notes?: string }): Promise<VerificationRequest> {
+    const response = await this.api.patch(`/users/admin/verification-requests/${id}/`, data);
+    return response.data;
+  }
+
+  async getPendingUsers(): Promise<User[]> {
+    const response = await this.api.get('/users/admin/pending-users/');
+    return response.data.results;
+  }
+
+  async getAdminUsersList(params?: { type?: string; verification_status?: string }): Promise<User[]> {
+    const response = await this.api.get('/users/admin/users/', { params });
+    return response.data;
+  }
+
+  async approveUser(userId: number): Promise<{ message: string; user: User }> {
+    const response = await this.api.post(`/users/admin/approve-user/${userId}/`);
+    return response.data;
+  }
+
+  async rejectUser(userId: number, reason?: string): Promise<{ message: string; user: User }> {
+    const response = await this.api.post(`/users/admin/reject-user/${userId}/`, { reason });
+    return response.data;
+  }
+
+  // Notification methods
   async getNotifications(): Promise<any[]> {
-    const response = await this.api.get('/chat/notifications/');
+    const response = await this.api.get('/notifications/');
     return response.data.results || response.data;
   }
 
   async markNotificationRead(notificationId: number): Promise<void> {
-    await this.api.post(`/chat/notifications/${notificationId}/read/`);
+    await this.api.patch(`/notifications/${notificationId}/mark-read/`);
   }
 
   async markAllNotificationsRead(): Promise<void> {
-    await this.api.post('/chat/notifications/read-all/');
+    await this.api.post('/notifications/mark-all-read/');
   }
 
   async deleteNotification(notificationId: number): Promise<void> {
-    await this.api.delete(`/chat/notifications/${notificationId}/`);
+    await this.api.delete(`/notifications/${notificationId}/`);
   }
 
-  // Seller Verification
+  // Order approval methods (for sellers)
+  async approveOrder(orderId: number): Promise<void> {
+    await this.api.post(`/orders/${orderId}/approve/`);
+  }
+
+  async rejectOrder(orderId: number): Promise<void> {
+    await this.api.post(`/orders/${orderId}/reject/`);
+  }
+
+  // Product rating methods
+  async createProductRating(productId: number, ratingData: any): Promise<any> {
+    const response = await this.api.post(`/products/${productId}/ratings/`, ratingData);
+    return response.data;
+  }
+
+  // Verification methods
   async getVerificationStatus(): Promise<any> {
     const response = await this.api.get('/users/verification-status/');
     return response.data;
   }
 
-  async submitVerification(formData: FormData): Promise<any> {
-    const response = await this.api.post('/users/verify-seller/', formData, {
-      headers: { 'Content-Type': 'multipart/form-data' }
+  async submitVerification(data: FormData): Promise<any> {
+    const response = await this.api.post('/users/submit-verification/', data, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
     });
     return response.data;
-  }
-
-  // Product rating endpoints
-  async createProductRating(productId: number, ratingData: { rating: number; review?: string }): Promise<void> {
-    await this.api.post(`/products/${productId}/rate/`, ratingData);
-  }
-
-  async getProductRatings(productId: number): Promise<any[]> {
-    const response = await this.api.get(`/products/${productId}/ratings/`);
-    return response.data.results;
-  }
-
-  // Order approval endpoints
-  async approveOrder(orderId: number): Promise<void> {
-    await this.api.post(`/orders/${orderId}/approve/`, { action: 'approve' });
-  }
-
-  async rejectOrder(orderId: number): Promise<void> {
-    await this.api.post(`/orders/${orderId}/approve/`, { action: 'reject' });
   }
 }
 

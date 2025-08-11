@@ -52,7 +52,7 @@ const LoginPage: React.FC = () => {
     setError('');
 
     try {
-      await login(formData.username, formData.password);
+      const user = await login(formData.username, formData.password);
       toast({
         title: 'Login successful!',
         description: 'Welcome back!',
@@ -60,7 +60,13 @@ const LoginPage: React.FC = () => {
         duration: 3000,
         isClosable: true,
       });
-      navigate('/dashboard');
+      
+      // Role-based redirect
+      if (user.user_type === 'admin') {
+        navigate('/admin-dashboard');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (err: any) {
       setError(err.response?.data?.message || 'Login failed. Please try again.');
       toast({

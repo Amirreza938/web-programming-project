@@ -11,6 +11,7 @@ from .serializers import (
     ProductCreateSerializer, ProductUpdateSerializer, OfferSerializer,
     OfferListSerializer, FavoriteSerializer, ProductSearchSerializer
 )
+from users.views import CanSellPermission, CanBuyPermission
 
 
 class CategoryListView(generics.ListAPIView):
@@ -29,12 +30,17 @@ class CategoryDetailView(generics.RetrieveAPIView):
 
 class ProductListCreateView(generics.ListCreateAPIView):
     """List products (GET) and create a new product (POST)"""
-    permission_classes = [permissions.IsAuthenticatedOrReadOnly]
     filter_backends = [DjangoFilterBackend, filters.SearchFilter, filters.OrderingFilter]
     filterset_fields = ['category', 'condition', 'city', 'country', 'is_negotiable']
     search_fields = ['title', 'description', 'brand', 'model']
     ordering_fields = ['price', 'created_at', 'views_count', 'favorites_count']
     ordering = ['-created_at']
+
+    def get_permissions(self):
+        if self.request.method == 'POST':
+            # Only sellers can create products
+            return [CanSellPermission()]
+        return [permissions.AllowAny()]
 
     def get_queryset(self):
         queryset = Product.objects.filter(is_active=True, status='active')
@@ -59,6 +65,11 @@ class ProductListCreateView(generics.ListCreateAPIView):
         return ProductListSerializer
 
     def perform_create(self, serializer):
+        # Check if user can sell
+        if not self.request.user.can_sell():
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("You don't have permission to create listings")
+        
         serializer.save(seller=self.request.user)
 
 
@@ -126,7 +137,7 @@ class MyProductsView(generics.ListAPIView):
 class OfferCreateView(generics.CreateAPIView):
     """Create an offer for a product"""
     serializer_class = OfferSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [CanBuyPermission]
     
     def create(self, request, *args, **kwargs):
         # Add debug logging
@@ -138,6 +149,11 @@ class OfferCreateView(generics.CreateAPIView):
             raise
     
     def perform_create(self, serializer):
+        # Check if user can buy
+        if not self.request.user.can_buy():
+            from rest_framework.exceptions import PermissionDenied
+            raise PermissionDenied("You don't have permission to make offers")
+        
         offer = serializer.save(buyer=self.request.user)
         
         # Add debug logging

@@ -99,7 +99,7 @@ const Navbar: React.FC = () => {
           <Flex align="center" display={{ base: 'none', md: 'flex' }}>
             <NavLink href="/products">Browse</NavLink>
             <NavLink href="/categories">Categories</NavLink>
-            {isAuthenticated && (
+            {isAuthenticated && user?.can_sell && (
               <NavLink href="/create-product">Sell</NavLink>
             )}
           </Flex>
@@ -163,15 +163,25 @@ const Navbar: React.FC = () => {
                     <MenuItem onClick={() => navigate('/profile')}>
                       Profile
                     </MenuItem>
-                    <MenuItem onClick={() => navigate('/dashboard')}>
-                      Dashboard
-                    </MenuItem>
-                    <MenuItem onClick={() => navigate('/orders')}>
-                      My Orders
-                    </MenuItem>
-                    <MenuItem onClick={() => navigate('/favorites')}>
-                      Favorites
-                    </MenuItem>
+                    {user?.user_type === 'admin' ? (
+                      <MenuItem onClick={() => navigate('/admin-dashboard')}>
+                        Admin Dashboard
+                      </MenuItem>
+                    ) : (
+                      <MenuItem onClick={() => navigate('/dashboard')}>
+                        Dashboard
+                      </MenuItem>
+                    )}
+                    {user?.can_buy && (
+                      <>
+                        <MenuItem onClick={() => navigate('/orders')}>
+                          My Orders
+                        </MenuItem>
+                        <MenuItem onClick={() => navigate('/favorites')}>
+                          Favorites
+                        </MenuItem>
+                      </>
+                    )}
                     <MenuDivider />
                     <MenuItem onClick={handleLogout} icon={<SettingsIcon />}>
                       Logout
@@ -257,7 +267,7 @@ const Navbar: React.FC = () => {
                 >
                   Categories
                 </Button>
-                {isAuthenticated && (
+                {isAuthenticated && user?.can_sell && (
                   <Button
                     variant="ghost"
                     justifyContent="flex-start"
@@ -285,46 +295,63 @@ const Navbar: React.FC = () => {
                     >
                       Profile
                     </Button>
-                    <Button
-                      variant="ghost"
-                      justifyContent="flex-start"
-                      onClick={() => {
-                        navigate('/dashboard');
-                        onClose();
-                      }}
-                    >
-                      Dashboard
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      justifyContent="flex-start"
-                      onClick={() => {
-                        navigate('/orders');
-                        onClose();
-                      }}
-                    >
-                      My Orders
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      justifyContent="flex-start"
-                      onClick={() => {
-                        navigate('/favorites');
-                        onClose();
-                      }}
-                    >
-                      Favorites
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      justifyContent="flex-start"
-                      onClick={() => {
-                        navigate('/chat');
-                        onClose();
-                      }}
-                    >
-                      Messages
-                    </Button>
+                    {user?.user_type === 'admin' ? (
+                      <Button
+                        variant="ghost"
+                        justifyContent="flex-start"
+                        onClick={() => {
+                          navigate('/admin-dashboard');
+                          onClose();
+                        }}
+                      >
+                        Admin Dashboard
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="ghost"
+                        justifyContent="flex-start"
+                        onClick={() => {
+                          navigate('/dashboard');
+                          onClose();
+                        }}
+                      >
+                        Dashboard
+                      </Button>
+                    )}
+                    {user?.can_buy && (
+                      <>
+                        <Button
+                          variant="ghost"
+                          justifyContent="flex-start"
+                          onClick={() => {
+                            navigate('/orders');
+                            onClose();
+                          }}
+                        >
+                          My Orders
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          justifyContent="flex-start"
+                          onClick={() => {
+                            navigate('/favorites');
+                            onClose();
+                          }}
+                        >
+                          Favorites
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          justifyContent="flex-start"
+                          onClick={() => {
+                            navigate('/chat');
+                            onClose();
+                          }}
+                        >
+                          Messages
+                        </Button>
+                      </>
+                    )}
                   </VStack>
                   <Divider />
                   <Button
