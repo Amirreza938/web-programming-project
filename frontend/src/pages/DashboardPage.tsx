@@ -62,6 +62,13 @@ const DashboardPage: React.FC = () => {
     queryFn: () => apiService.getUserOrders({ page: 1, limit: 5 }),
   });
 
+  // Fetch received offers (for sellers)
+  const { data: receivedOffers } = useQuery({
+    queryKey: ['receivedOffers'],
+    queryFn: () => apiService.getMyReceivedOffers(),
+    enabled: !!user?.can_sell, // Only fetch if user can sell
+  });
+
   if (isLoading) {
     return <LoadingSpinner />;
   }
@@ -228,6 +235,16 @@ const DashboardPage: React.FC = () => {
                 <TabList>
                   <Tab>Recent Listings</Tab>
                   <Tab>Recent Orders</Tab>
+                  {user?.can_sell && (
+                    <Tab>
+                      Offers
+                      {receivedOffers && receivedOffers.filter(o => o.status === 'pending').length > 0 && (
+                        <Badge ml={2} colorScheme="red" borderRadius="full">
+                          {receivedOffers.filter(o => o.status === 'pending').length}
+                        </Badge>
+                      )}
+                    </Tab>
+                  )}
                   <Tab>Analytics</Tab>
                 </TabList>
 
@@ -364,6 +381,97 @@ const DashboardPage: React.FC = () => {
                     </VStack>
                   </TabPanel>
 
+                  {/* Offers Tab (for sellers) */}
+                  {user?.can_sell && (
+                    <TabPanel>
+                      <VStack spacing={4} align="stretch">
+                        <HStack justify="space-between" align="center">
+                          <Heading as="h3" size="md">
+                            Recent Offers on Your Products
+                          </Heading>
+                          <Button
+                            size="sm"
+                            colorScheme="brand"
+                            variant="outline"
+                            onClick={() => navigate('/offers')}
+                          >
+                            View All Offers
+                          </Button>
+                        </HStack>
+                        
+                        {receivedOffers && receivedOffers.length > 0 ? (
+                          <VStack spacing={4}>
+                            {receivedOffers.slice(0, 5).map((offer) => (
+                              <Card key={offer.id} w="full">
+                                <CardBody p={4}>
+                                  <HStack justify="space-between" align="start">
+                                    <VStack align="start" spacing={2}>
+                                      <Text fontWeight="semibold">
+                                        {offer.product_title}
+                                      </Text>
+                                      <Text fontSize="sm" color="gray.600">
+                                        Offer from: {offer.buyer_name}
+                                      </Text>
+                                      <HStack spacing={2}>
+                                        <Badge
+                                          colorScheme={
+                                            offer.status === 'pending' ? 'yellow' :
+                                            offer.status === 'accepted' ? 'green' : 'red'
+                                          }
+                                          variant="outline"
+                                        >
+                                          {offer.status}
+                                        </Badge>
+                                        <Text fontSize="lg" fontWeight="bold" color="green.500">
+                                          ${offer.amount}
+                                        </Text>
+                                      </HStack>
+                                    </VStack>
+                                    
+                                    <VStack align="end" spacing={1}>
+                                      <Text fontSize="sm" color="gray.600">
+                                        {new Date(offer.created_at).toLocaleDateString()}
+                                      </Text>
+                                      {offer.status === 'pending' && (
+                                        <HStack spacing={2}>
+                                          <Button
+                                            size="xs"
+                                            colorScheme="green"
+                                            onClick={() => navigate('/offers')}
+                                          >
+                                            Accept
+                                          </Button>
+                                          <Button
+                                            size="xs"
+                                            colorScheme="red"
+                                            variant="outline"
+                                            onClick={() => navigate('/offers')}
+                                          >
+                                            Reject
+                                          </Button>
+                                        </HStack>
+                                      )}
+                                    </VStack>
+                                  </HStack>
+                                </CardBody>
+                              </Card>
+                            ))}
+                          </VStack>
+                        ) : (
+                          <VStack spacing={4} py={8}>
+                            <Text color="gray.600">No offers received yet</Text>
+                            <Button
+                              colorScheme="brand"
+                              onClick={() => navigate('/create-product')}
+                            >
+                              Create Listings to Receive Offers
+                            </Button>
+                          </VStack>
+                        )}
+                      </VStack>
+                    </TabPanel>
+                  )}
+
                   {/* Analytics */}
                   <TabPanel>
                     <VStack spacing={6} align="stretch">
@@ -436,4 +544,4 @@ const DashboardPage: React.FC = () => {
   );
 };
 
-export default DashboardPage; 
+export default DashboardPage;

@@ -21,7 +21,6 @@ const UserStatusMonitor: React.FC = () => {
         // Poll for approval status every 15 seconds for pending users
         const interval = setInterval(async () => {
           try {
-            console.log('Checking for user approval status...');
             await refreshUser();
           } catch (error) {
             console.error('Failed to refresh user status:', error);
@@ -36,12 +35,8 @@ const UserStatusMonitor: React.FC = () => {
   // Detect approval status changes
   useEffect(() => {
     if (user && (user.user_type === 'seller' || user.user_type === 'both')) {
-      console.log('Current user approval status:', user.account_approved);
-      console.log('Previous approval status:', previousApprovalStatus.current);
-      
       // Check if approval status changed from false to true
       if (user.account_approved && previousApprovalStatus.current === false) {
-        console.log('User was just approved! Showing toast and reloading...');
         toast({
           title: 'Account Approved! 🎉',
           description: 'Your seller account has been approved! You can now start selling products.',

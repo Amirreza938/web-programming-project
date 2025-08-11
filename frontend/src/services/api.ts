@@ -94,6 +94,9 @@ export interface Offer {
   product: number;
   buyer: number;
   buyer_name: string;
+  buyer_image?: string;
+  product_title: string;
+  product_image?: string;
   amount: number;
   message?: string;
   status: 'pending' | 'accepted' | 'rejected';
@@ -457,6 +460,11 @@ class ApiService {
     return response.data.results || response.data;
   }
 
+  async getMyReceivedOffers(): Promise<Offer[]> {
+    const response = await this.api.get('/products/offers/received/');
+    return response.data.results || response.data;
+  }
+
   async getOffer(offerId: number): Promise<Offer> {
     const response = await this.api.get(`/products/offers/${offerId}/`);
     return response.data;
@@ -739,11 +747,11 @@ class ApiService {
 
   // Order approval methods (for sellers)
   async approveOrder(orderId: number): Promise<void> {
-    await this.api.post(`/orders/${orderId}/approve/`);
+    await this.api.post(`/orders/${orderId}/approve/`, { action: 'approve' });
   }
 
   async rejectOrder(orderId: number): Promise<void> {
-    await this.api.post(`/orders/${orderId}/reject/`);
+    await this.api.post(`/orders/${orderId}/approve/`, { action: 'reject' });
   }
 
   // Product rating methods

@@ -203,6 +203,18 @@ class MyOffersView(generics.ListAPIView):
         return Offer.objects.filter(buyer=self.request.user).order_by('-created_at')
 
 
+class MyReceivedOffersView(generics.ListAPIView):
+    """Get offers received by current user (seller only)"""
+    serializer_class = OfferListSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    
+    def get_queryset(self):
+        # Get all offers for products owned by the current user
+        return Offer.objects.filter(
+            product__seller=self.request.user
+        ).order_by('-created_at')
+
+
 class OfferDetailView(generics.RetrieveAPIView):
     """Get offer details"""
     serializer_class = OfferSerializer
@@ -280,21 +292,6 @@ def reject_offer(request, offer_id):
         related_product=offer.product
     )
     
-    return Response({'message': 'Offer rejected successfully'})
-    
-    if offer.product.seller != request.user:
-        return Response(
-            {'error': 'You can only reject offers for your own products'}, 
-            status=status.HTTP_403_FORBIDDEN
-        )
-    
-    if offer.status != 'pending':
-        return Response(
-            {'error': 'Offer is not pending'}, 
-            status=status.HTTP_400_BAD_REQUEST
-        )
-    
-    offer.reject()
     return Response({'message': 'Offer rejected successfully'})
 
 
@@ -591,6 +588,3 @@ def get_product_ratings(request, product_id):
             {'error': 'Product not found'}, 
             status=status.HTTP_404_NOT_FOUND
         )
-
-
-# ...existing code...

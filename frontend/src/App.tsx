@@ -23,6 +23,7 @@ import OrderTrackingPage from './pages/OrderTrackingPage';
 import OrderDetailPage from './pages/OrderDetailPage';
 import CheckoutPage from './pages/CheckoutPage';
 import ApprovalPendingPage from './pages/ApprovalPendingPage';
+import OffersPage from './pages/OffersPage';
 
 // Components
 import Navbar from './components/layout/Navbar';
@@ -178,6 +179,14 @@ const App: React.FC = () => {
                     }
                   />
                   <Route
+                    path="/products/:productId/checkout"
+                    element={
+                      <ProtectedRoute allowedRoles={['buyer', 'both']}>
+                        <CheckoutPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
                     path="/approval-pending"
                     element={
                       <ProtectedRoute>
@@ -190,6 +199,14 @@ const App: React.FC = () => {
                     element={
                       <ProtectedRoute>
                         <OrderTrackingPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/offers"
+                    element={
+                      <ProtectedRoute>
+                        <OffersPage />
                       </ProtectedRoute>
                     }
                   />

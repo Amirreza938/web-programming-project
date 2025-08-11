@@ -111,12 +111,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   const refreshUser = async () => {
     try {
-      console.log('Refreshing user data...');
       const updatedUser = await apiService.getProfile();
-      console.log('Updated user data received:', updatedUser);
       setUser(updatedUser);
       localStorage.setItem('user', JSON.stringify(updatedUser));
-      console.log('User state updated successfully');
     } catch (error) {
       console.error('Refresh user error:', error);
       throw error;

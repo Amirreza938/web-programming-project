@@ -68,16 +68,41 @@ class OrderCreateSerializer(serializers.ModelSerializer):
         ]
     
     def validate(self, attrs):
+        print(f"[DEBUG] OrderCreateSerializer.validate called with attrs: {attrs}")
         product = attrs['product']
         user = self.context['request'].user
+        accepted_offer = attrs.get('accepted_offer')
+        print(f"[DEBUG] Product: {product}, User: {user}, Accepted Offer: {accepted_offer}")
         
-        # Check if product is available
-        if not product.is_available():
-            raise serializers.ValidationError("Product is not available for purchase")
+        # Check if product is available for this user/offer
+        if accepted_offer:
+            print(f"[DEBUG] Checking availability for accepted offer: {accepted_offer.id}")
+            # For accepted offers, use the specific availability check
+            if not product.is_available_for_user(user=user, offer=accepted_offer):
+                print(f"[DEBUG] Accepted offer is not valid for purchase")
+                raise serializers.ValidationError("This offer has expired or is no longer valid for purchase")
+        else:
+            print(f"[DEBUG] Checking standard product availability")
+            # For regular purchases, use standard availability check
+            if not product.is_available():
+                print(f"[DEBUG] Product not available: {product.status}")
+                raise serializers.ValidationError("Product is not available for purchase")
         
         # Check if user is not the seller
         if product.seller == user:
+            print(f"[DEBUG] User is the seller")
             raise serializers.ValidationError("You cannot purchase your own product")
+        
+        # Convert shipping_method ID to method name
+        if 'shipping_method' in attrs and isinstance(attrs['shipping_method'], int):
+            print(f"[DEBUG] Converting shipping method ID {attrs['shipping_method']} to name")
+            try:
+                shipping_method_obj = ShippingMethod.objects.get(id=attrs['shipping_method'])
+                attrs['shipping_method'] = shipping_method_obj.name
+                print(f"[DEBUG] Converted to: {attrs['shipping_method']}")
+            except ShippingMethod.DoesNotExist:
+                print(f"[DEBUG] Invalid shipping method ID: {attrs['shipping_method']}")
+                raise serializers.ValidationError("Invalid shipping method")
         
         # Set buyer and seller
         attrs['buyer'] = user
@@ -85,13 +110,16 @@ class OrderCreateSerializer(serializers.ModelSerializer):
         
         # Set pricing
         if attrs.get('accepted_offer'):
+            print(f"[DEBUG] Using offer price: {attrs['accepted_offer'].amount}")
             attrs['unit_price'] = attrs['accepted_offer'].amount
         else:
+            print(f"[DEBUG] Using product price: {product.price}")
             attrs['unit_price'] = product.price
         
         attrs['shipping_cost'] = product.shipping_cost
         attrs['total_amount'] = attrs['unit_price'] + attrs['shipping_cost']
         
+        print(f"[DEBUG] Final attrs: {attrs}")
         return attrs
 
 

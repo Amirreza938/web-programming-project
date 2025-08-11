@@ -23,7 +23,7 @@ import {
   Alert,
   AlertIcon,
 } from '@chakra-ui/react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, useParams } from 'react-router-dom';
 import { useQuery, useMutation } from '@tanstack/react-query';
 import { apiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
@@ -31,10 +31,12 @@ import LoadingSpinner from '../components/common/LoadingSpinner';
 
 const CheckoutPage: React.FC = () => {
   const [searchParams] = useSearchParams();
+  const { productId: urlProductId } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
   const toast = useToast();
-  const productId = searchParams.get('product');
+  const productId = urlProductId || searchParams.get('product');
+  const offerId = searchParams.get('offer');
   
   const [formData, setFormData] = useState({
     quantity: 1,
@@ -58,10 +60,21 @@ const CheckoutPage: React.FC = () => {
     enabled: !!productId,
   });
 
+  // Fetch offer details if offerId is provided
+  const { data: offer, isLoading: offerLoading } = useQuery({
+    queryKey: ['offer', offerId],
+    queryFn: () => apiService.getOffer(parseInt(offerId!)),
+    enabled: !!offerId,
+  });
+
   // Create order mutation
   const createOrderMutation = useMutation({
-    mutationFn: (orderData: any) => apiService.createOrder(orderData),
+    mutationFn: (orderData: any) => {
+      console.log('API call starting with data:', orderData);
+      return apiService.createOrder(orderData);
+    },
     onSuccess: (order) => {
+      console.log('Order created successfully:', order);
       toast({
         title: 'Order placed successfully!',
         description: `Your order #${order.id} has been placed.`,
@@ -72,9 +85,11 @@ const CheckoutPage: React.FC = () => {
       navigate(`/orders/${order.id}/tracking`);
     },
     onError: (error: any) => {
+      console.error('Order creation failed:', error);
+      console.error('Error response:', error.response?.data);
       toast({
         title: 'Order failed',
-        description: error.response?.data?.message || 'Unable to place order',
+        description: error.response?.data?.message || error.response?.data?.detail || 'Unable to place order',
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -88,8 +103,12 @@ const CheckoutPage: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    console.log('handleSubmit called!');
     
-    if (!product) return;
+    if (!product) {
+      console.log('No product found, returning');
+      return;
+    }
 
     const orderData = {
       product: product.id,
@@ -99,12 +118,55 @@ const CheckoutPage: React.FC = () => {
       shipping_postal_code: formData.shipping_postal_code,
       shipping_phone: formData.phone,
       shipping_method: formData.shipping_method,
+      ...(offer && { accepted_offer: offer.id }), // Include offer ID if checkout is for accepted offer
     };
 
+    console.log('Submitting order with data:', orderData);
+    console.log('Offer details:', offer);
+    console.log('Product details:', product);
+    console.log('FormData state:', formData);
+    console.log('Required field check:');
+    console.log('- product:', product.id);
+    console.log('- shipping_address:', formData.shipping_address);
+    console.log('- shipping_city:', formData.shipping_city);
+    console.log('- shipping_country:', formData.shipping_country);
+    console.log('- shipping_postal_code:', formData.shipping_postal_code);
+    console.log('- shipping_phone:', formData.phone);
+    console.log('- shipping_method:', formData.shipping_method);
     createOrderMutation.mutate(orderData);
   };
 
-  if (isLoading) {
+  const handlePlaceOrderClick = () => {
+    console.log('Place Order button clicked!');
+    console.log('Current form data:', formData);
+    
+    // Check if required fields are filled
+    const requiredFields = ['shipping_address', 'shipping_city', 'shipping_country', 'shipping_postal_code', 'phone'];
+    const missingFields = requiredFields.filter(field => !formData[field as keyof typeof formData]);
+    
+    if (missingFields.length > 0) {
+      console.log('Missing required fields:', missingFields);
+      toast({
+        title: 'Missing Required Fields',
+        description: `Please fill in: ${missingFields.join(', ')}`,
+        status: 'error',
+        duration: 5000,
+        isClosable: true,
+      });
+      return;
+    }
+    
+    // Trigger form submission
+    const form = document.querySelector('form');
+    if (form) {
+      console.log('Submitting form...');
+      form.requestSubmit();
+    } else {
+      console.log('Form not found!');
+    }
+  };
+
+  if (isLoading || offerLoading) {
     return <LoadingSpinner />;
   }
 
@@ -125,7 +187,9 @@ const CheckoutPage: React.FC = () => {
     );
   }
 
-  const totalAmount = product.price * formData.quantity;
+  // Calculate total amount - use offer amount if available, otherwise product price
+  const basePrice = offer ? offer.amount : product.price;
+  const totalAmount = basePrice * formData.quantity;
 
   return (
     <Box minH="100vh" bg="gray.50" py={8}>
@@ -135,9 +199,19 @@ const CheckoutPage: React.FC = () => {
             <Heading as="h1" size="xl" color="brand.500">
               Checkout
             </Heading>
-            <Text color="gray.600">
-              Complete your purchase
-            </Text>
+            {offer ? (
+              <Alert status="success">
+                <AlertIcon />
+                <VStack align="start" spacing={1}>
+                  <Text fontWeight="bold">Purchasing via Accepted Offer</Text>
+                  <Text fontSize="sm">Your offer of ${offer.amount} was accepted!</Text>
+                </VStack>
+              </Alert>
+            ) : (
+              <Text color="gray.600">
+                Complete your purchase
+              </Text>
+            )}
           </VStack>
 
           <form onSubmit={handleSubmit}>
@@ -173,7 +247,18 @@ const CheckoutPage: React.FC = () => {
 
                     <HStack justify="space-between">
                       <Text>Price per item:</Text>
-                      <Text fontWeight="semibold">${product.price}</Text>
+                      <VStack align="end" spacing={0}>
+                        {offer ? (
+                          <>
+                            <Text fontWeight="semibold" color="green.500">${offer.amount}</Text>
+                            <Text fontSize="sm" color="gray.500" textDecoration="line-through">
+                              ${product.price}
+                            </Text>
+                          </>
+                        ) : (
+                          <Text fontWeight="semibold">${product.price}</Text>
+                        )}
+                      </VStack>
                     </HStack>
 
                     <HStack justify="space-between">
@@ -351,6 +436,7 @@ const CheckoutPage: React.FC = () => {
                     size="lg"
                     isLoading={createOrderMutation.isPending}
                     loadingText="Placing Order..."
+                    onClick={handlePlaceOrderClick}
                   >
                     Place Order - ${totalAmount}
                   </Button>

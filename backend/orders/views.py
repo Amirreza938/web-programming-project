@@ -406,19 +406,28 @@ class OrderApprovalView(APIView):
     permission_classes = [permissions.IsAuthenticated]
     
     def post(self, request, order_id):
+        print(f"[DEBUG] OrderApprovalView: order_id={order_id}, user={request.user}")
+        print(f"[DEBUG] Request data: {request.data}")
+        
         try:
             order = Order.objects.get(id=order_id, seller=request.user)
+            print(f"[DEBUG] Found order: {order}, status: {order.status}")
         except Order.DoesNotExist:
+            print(f"[DEBUG] Order not found for id={order_id}, user={request.user}")
             return Response({'error': 'Order not found or you are not authorized to modify this order'}, 
                           status=status.HTTP_404_NOT_FOUND)
         
         action = request.data.get('action')
+        print(f"[DEBUG] Action: {action}")
+        
         if action not in ['approve', 'reject']:
+            print(f"[DEBUG] Invalid action: {action}")
             return Response({'error': 'Invalid action. Must be "approve" or "reject"'}, 
                           status=status.HTTP_400_BAD_REQUEST)
         
         if order.status != 'pending':
-            return Response({'error': 'Order is not in pending status'}, 
+            print(f"[DEBUG] Order status is not pending: {order.status}")
+            return Response({'error': f'Order is not in pending status. Current status: {order.status}'}, 
                           status=status.HTTP_400_BAD_REQUEST)
         
         if action == 'approve':

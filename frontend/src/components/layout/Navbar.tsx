@@ -177,6 +177,9 @@ const Navbar: React.FC = () => {
                         <MenuItem onClick={() => navigate('/orders')}>
                           My Orders
                         </MenuItem>
+                        <MenuItem onClick={() => navigate('/offers')}>
+                          Offers
+                        </MenuItem>
                         <MenuItem onClick={() => navigate('/favorites')}>
                           Favorites
                         </MenuItem>
@@ -334,6 +337,16 @@ const Navbar: React.FC = () => {
                           variant="ghost"
                           justifyContent="flex-start"
                           onClick={() => {
+                            navigate('/offers');
+                            onClose();
+                          }}
+                        >
+                          Offers
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          justifyContent="flex-start"
+                          onClick={() => {
                             navigate('/favorites');
                             onClose();
                           }}
@@ -403,4 +416,4 @@ const Navbar: React.FC = () => {
   );
 };
 
-export default Navbar; 
+export default Navbar;
