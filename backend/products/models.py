@@ -22,7 +22,7 @@ class Category(models.Model):
         return self.name
     
     def get_products_count(self):
-        return self.products.filter(is_active=True).count()
+        return self.products.filter(is_active=True, status='active').count()
 
 
 class Product(models.Model):

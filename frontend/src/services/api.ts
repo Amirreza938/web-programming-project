@@ -760,7 +760,12 @@ class ApiService {
 
   // Product rating methods
   async createProductRating(productId: number, ratingData: any): Promise<any> {
-    const response = await this.api.post(`/products/${productId}/ratings/`, ratingData);
+    const response = await this.api.post(`/products/${productId}/rate/`, ratingData);
+    return response.data;
+  }
+
+  async getProductRatings(productId: number): Promise<any> {
+    const response = await this.api.get(`/products/${productId}/ratings/`);
     return response.data;
   }
 

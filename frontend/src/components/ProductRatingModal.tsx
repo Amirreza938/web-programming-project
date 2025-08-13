@@ -48,7 +48,10 @@ const ProductRatingModal: React.FC<ProductRatingModalProps> = ({
         duration: 3000,
         isClosable: true,
       });
+      // Invalidate both product and product ratings queries
       queryClient.invalidateQueries({ queryKey: ['product', productId] });
+      queryClient.invalidateQueries({ queryKey: ['product-ratings', productId] });
+      queryClient.invalidateQueries({ queryKey: ['products'] }); // Also refresh product lists
       onClose();
       setRating(0);
       setReview('');

@@ -62,6 +62,7 @@ const ProductListPage: React.FC = () => {
   const search = searchParams.get('search') || '';
   const category = searchParams.get('category') || '';
   const condition = searchParams.get('condition') || '';
+  const location = searchParams.get('location') || '';
   const minPrice = searchParams.get('minPrice') || '0';
   const maxPrice = searchParams.get('maxPrice') || '10000';
   const sortBy = searchParams.get('sortBy') || 'newest';
@@ -71,6 +72,7 @@ const ProductListPage: React.FC = () => {
   const [localSearch, setLocalSearch] = useState(search);
   const [localCategory, setLocalCategory] = useState(category);
   const [localCondition, setLocalCondition] = useState(condition);
+  const [localLocation, setLocalLocation] = useState(location);
   const [localPriceRange, setLocalPriceRange] = useState([parseInt(minPrice), parseInt(maxPrice)]);
   const [localSortBy, setLocalSortBy] = useState(sortBy);
 
@@ -98,11 +100,12 @@ const ProductListPage: React.FC = () => {
 
   // Fetch products with filters
   const { data: productsData, isLoading, error } = useQuery({
-    queryKey: ['products', search, category, condition, minPrice, maxPrice, sortBy, page],
+    queryKey: ['products', search, category, condition, location, minPrice, maxPrice, sortBy, page],
     queryFn: () => apiService.getProducts({
       search,
       category,
       condition,
+      location,
       min_price: minPrice,
       max_price: maxPrice,
       ordering: getSortOrderingParam(sortBy),
@@ -135,13 +138,14 @@ const ProductListPage: React.FC = () => {
     if (search) params.set('search', search);
     if (category) params.set('category', category);
     if (condition) params.set('condition', condition);
+    if (location) params.set('location', location);
     if (minPrice !== '0') params.set('minPrice', minPrice);
     if (maxPrice !== '10000') params.set('maxPrice', maxPrice);
     if (sortBy !== 'newest') params.set('sortBy', sortBy);
     if (page > 1) params.set('page', page.toString());
     
     setSearchParams(params);
-  }, [search, category, condition, minPrice, maxPrice, sortBy, page, setSearchParams]);
+  }, [search, category, condition, location, minPrice, maxPrice, sortBy, page, setSearchParams]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -159,6 +163,7 @@ const ProductListPage: React.FC = () => {
     setLocalSearch('');
     setLocalCategory('');
     setLocalCondition('');
+    setLocalLocation('');
     setLocalPriceRange([0, 10000]);
     setLocalSortBy('newest');
     setSearchParams({});
@@ -174,6 +179,7 @@ const ProductListPage: React.FC = () => {
       if (localSearch) newParams.set('search', localSearch);
       if (localCategory) newParams.set('category', localCategory);
       if (localCondition) newParams.set('condition', localCondition);
+      if (localLocation) newParams.set('location', localLocation);
       newParams.set('minPrice', localPriceRange[0].toString());
       newParams.set('maxPrice', localPriceRange[1].toString());
       newParams.set('sortBy', localSortBy);
@@ -303,6 +309,16 @@ const ProductListPage: React.FC = () => {
                         </option>
                       ))}
                     </Select>
+                  </VStack>
+
+                  {/* Location Filter */}
+                  <VStack align="stretch" spacing={3}>
+                    <Text fontWeight="semibold">Location</Text>
+                    <Input
+                      value={localLocation}
+                      onChange={(e) => setLocalLocation(e.target.value)}
+                      placeholder="Enter city or country..."
+                    />
                   </VStack>
 
                   {/* Price Range Filter */}
@@ -486,6 +502,16 @@ const ProductListPage: React.FC = () => {
                       </option>
                     ))}
                   </Select>
+                </VStack>
+
+                {/* Location Filter */}
+                <VStack align="stretch" spacing={3}>
+                  <Text fontWeight="semibold">Location</Text>
+                  <Input
+                    value={localLocation}
+                    onChange={(e) => setLocalLocation(e.target.value)}
+                    placeholder="Enter city or country..."
+                  />
                 </VStack>
 
                 {/* Price Range Filter */}
