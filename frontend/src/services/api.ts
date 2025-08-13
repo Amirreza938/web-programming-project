@@ -747,11 +747,11 @@ class ApiService {
 
   // Order approval methods (for sellers)
   async approveOrder(orderId: number): Promise<void> {
-    await this.api.post(`/orders/${orderId}/approve/`, { action: 'approve' });
+    await this.api.post(`/orders/${orderId}/approve/`);
   }
 
   async rejectOrder(orderId: number): Promise<void> {
-    await this.api.post(`/orders/${orderId}/approve/`, { action: 'reject' });
+    await this.api.post(`/orders/${orderId}/reject/`);
   }
 
   // Product rating methods

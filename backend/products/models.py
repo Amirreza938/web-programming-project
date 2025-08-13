@@ -108,15 +108,6 @@ class Product(models.Model):
     def is_available(self):
         return self.status == 'active' and self.is_active
     
-    def is_available_for_user(self, user=None, offer=None):
-        """Check if product is available for a specific user/offer"""
-        # If there's an accepted offer, check if it's valid and belongs to the user
-        if offer and offer.product == self and offer.buyer == user:
-            return offer.is_valid_for_purchase()
-        
-        # Otherwise, use standard availability check
-        return self.is_available()
-    
     def update_rating(self):
         """Update product average rating based on all ratings"""
         from django.db.models import Avg
@@ -188,31 +179,11 @@ class Offer(models.Model):
         return f"${self.amount} offer by {self.buyer.username} for {self.product.title}"
     
     def accept(self):
-        from django.utils import timezone
-        from datetime import timedelta
-        
         self.status = 'accepted'
-        # Set expiration time to 24 hours from now
-        self.expires_at = timezone.now() + timedelta(hours=24)
         self.save()
-        
-        # DO NOT change product status to sold yet
-        # Product will be marked as sold only when the order is actually created
-    
-    def is_valid_for_purchase(self):
-        """Check if an accepted offer is still valid for purchase"""
-        from django.utils import timezone
-        
-        if self.status != 'accepted':
-            return False
-        
-        if self.expires_at and timezone.now() > self.expires_at:
-            # Offer has expired, mark it as expired
-            self.status = 'expired'
-            self.save()
-            return False
-        
-        return True
+        # Update product status to sold
+        self.product.status = 'sold'
+        self.product.save()
     
     def reject(self):
         self.status = 'rejected'

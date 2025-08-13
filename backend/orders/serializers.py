@@ -71,22 +71,12 @@ class OrderCreateSerializer(serializers.ModelSerializer):
         print(f"[DEBUG] OrderCreateSerializer.validate called with attrs: {attrs}")
         product = attrs['product']
         user = self.context['request'].user
-        accepted_offer = attrs.get('accepted_offer')
-        print(f"[DEBUG] Product: {product}, User: {user}, Accepted Offer: {accepted_offer}")
+        print(f"[DEBUG] Product: {product}, User: {user}")
         
-        # Check if product is available for this user/offer
-        if accepted_offer:
-            print(f"[DEBUG] Checking availability for accepted offer: {accepted_offer.id}")
-            # For accepted offers, use the specific availability check
-            if not product.is_available_for_user(user=user, offer=accepted_offer):
-                print(f"[DEBUG] Accepted offer is not valid for purchase")
-                raise serializers.ValidationError("This offer has expired or is no longer valid for purchase")
-        else:
-            print(f"[DEBUG] Checking standard product availability")
-            # For regular purchases, use standard availability check
-            if not product.is_available():
-                print(f"[DEBUG] Product not available: {product.status}")
-                raise serializers.ValidationError("Product is not available for purchase")
+        # Check if product is available
+        if not product.is_available():
+            print(f"[DEBUG] Product not available: {product.status}")
+            raise serializers.ValidationError("Product is not available for purchase")
         
         # Check if user is not the seller
         if product.seller == user:
