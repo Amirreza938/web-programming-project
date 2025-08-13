@@ -86,7 +86,11 @@ export interface Category {
   id: number;
   name: string;
   description?: string;
-  product_count?: number;
+  parent?: number | null;
+  image?: string | null;
+  is_active?: boolean;
+  products_count?: number;
+  created_at?: string;
 }
 
 export interface Offer {

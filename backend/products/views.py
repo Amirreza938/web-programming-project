@@ -44,12 +44,16 @@ class ProductListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         queryset = Product.objects.filter(is_active=True, status='active')
+        
+        # Price filtering
         min_price = self.request.query_params.get('min_price')
         max_price = self.request.query_params.get('max_price')
         if min_price:
             queryset = queryset.filter(price__gte=min_price)
         if max_price:
             queryset = queryset.filter(price__lte=max_price)
+            
+        # Location filtering
         location = self.request.query_params.get('location')
         if location:
             queryset = queryset.filter(
@@ -57,6 +61,7 @@ class ProductListCreateView(generics.ListCreateAPIView):
                 Q(country__icontains=location) |
                 Q(location__icontains=location)
             )
+            
         return queryset
 
     def get_serializer_class(self):

@@ -24,6 +24,7 @@ import OrderDetailPage from './pages/OrderDetailPage';
 import CheckoutPage from './pages/CheckoutPage';
 import ApprovalPendingPage from './pages/ApprovalPendingPage';
 import OffersPage from './pages/OffersPage';
+import CategoriesPage from './pages/CategoriesPage';
 
 // Components
 import Navbar from './components/layout/Navbar';
@@ -82,6 +83,7 @@ const App: React.FC = () => {
                   <Route path="/register" element={<RegisterPage />} />
                   <Route path="/products" element={<ProductListPage />} />
                   <Route path="/products/:id" element={<ProductDetailPage />} />
+                  <Route path="/categories" element={<CategoriesPage />} />
                   <Route
                     path="/create-product"
                     element={

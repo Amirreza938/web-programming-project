@@ -83,6 +83,19 @@ const ProductListPage: React.FC = () => {
   // Ensure categories is always an array
   const categoriesArray = Array.isArray(categories) ? categories : [];
 
+  // Convert sort value to DRF ordering parameter
+  const getSortOrderingParam = (sortValue: string) => {
+    const sortMapping: { [key: string]: string } = {
+      'newest': '-created_at',
+      'oldest': 'created_at',
+      'price_low': 'price',
+      'price_high': '-price',
+      'popular': '-favorites_count',
+      'views': '-views_count',
+    };
+    return sortMapping[sortValue] || '-created_at';
+  };
+
   // Fetch products with filters
   const { data: productsData, isLoading, error } = useQuery({
     queryKey: ['products', search, category, condition, minPrice, maxPrice, sortBy, page],
@@ -92,7 +105,7 @@ const ProductListPage: React.FC = () => {
       condition,
       min_price: minPrice,
       max_price: maxPrice,
-      sort_by: sortBy,
+      ordering: getSortOrderingParam(sortBy),
       page,
     }),
     placeholderData: (previousData) => previousData,
