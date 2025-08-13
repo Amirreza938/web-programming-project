@@ -33,10 +33,6 @@ urlpatterns = [
     path('favorites/<int:product_id>/remove/', views.remove_favorite, name='remove-favorite'),
     path('<int:product_id>/toggle-favorite/', views.toggle_favorite, name='toggle-favorite'),
     
-    # Ratings
-    path('<int:product_id>/rate/', views.create_product_rating, name='create-product-rating'),
-    path('<int:product_id>/ratings/', views.get_product_ratings, name='get-product-ratings'),
-    
     # Search and discovery
     path('search/', views.search_products, name='search-products'),
     path('featured/', views.featured_products, name='featured-products'),

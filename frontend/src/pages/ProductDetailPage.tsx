@@ -43,7 +43,6 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import LoadingSpinner from '../components/common/LoadingSpinner';
-import ProductRatingModal from '../components/ProductRatingModal';
 
 const ProductDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -52,11 +51,6 @@ const ProductDetailPage: React.FC = () => {
   const toast = useToast();
   const queryClient = useQueryClient();
   const { isOpen, onOpen, onClose } = useDisclosure();
-  const { 
-    isOpen: isRatingOpen, 
-    onOpen: onRatingOpen, 
-    onClose: onRatingClose 
-  } = useDisclosure();
   
   const bg = useColorModeValue('white', 'gray.800');
   const cardBg = useColorModeValue('white', 'gray.700');
@@ -298,7 +292,15 @@ const ProductDetailPage: React.FC = () => {
                     src={product.seller_image}
                   />
                   <VStack align="start" spacing={1}>
-                    <Text fontWeight="semibold">{product.seller_name}</Text>
+                    <Text 
+                      fontWeight="semibold"
+                      color="blue.500"
+                      cursor="pointer"
+                      _hover={{ textDecoration: 'underline' }}
+                      onClick={() => navigate(`/user/${product.seller}`)}
+                    >
+                      {product.seller_name}
+                    </Text>
                     <HStack spacing={2}>
                       <StarIcon color="yellow.400" />
                       <Text fontSize="sm" color="gray.600">
@@ -382,16 +384,6 @@ const ProductDetailPage: React.FC = () => {
                       </Button>
                     )}
                   </HStack>
-                  
-                  <Button
-                    variant="outline"
-                    size="md"
-                    w="full"
-                    onClick={onRatingOpen}
-                    leftIcon={<StarIcon />}
-                  >
-                    Rate This Product
-                  </Button>
                 </VStack>
               )}
 
@@ -501,14 +493,6 @@ const ProductDetailPage: React.FC = () => {
             </ModalBody>
           </ModalContent>
         </Modal>
-
-        {/* Product Rating Modal */}
-        <ProductRatingModal
-          isOpen={isRatingOpen}
-          onClose={onRatingClose}
-          productId={product.id}
-          productTitle={product.title}
-        />
       </Container>
     </Box>
   );

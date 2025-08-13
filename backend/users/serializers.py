@@ -180,25 +180,58 @@ class UserRatingSerializer(serializers.ModelSerializer):
     """Serializer for user ratings"""
     from_user_name = serializers.CharField(source='from_user.username', read_only=True)
     to_user_name = serializers.CharField(source='to_user.username', read_only=True)
+    to_user = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), required=False)
+    order = serializers.IntegerField(write_only=True, required=True)  # Order ID is required
     
     class Meta:
         model = UserRating
         fields = [
             'id', 'from_user', 'from_user_name', 'to_user', 'to_user_name',
-            'rating', 'review', 'created_at'
+            'order', 'rating', 'review', 'created_at'
         ]
         read_only_fields = ['id', 'from_user', 'from_user_name', 'created_at']
     
     def validate(self, attrs):
         from_user = self.context['request'].user
-        to_user = attrs['to_user']
+        
+        # Handle to_user from URL parameter or from data
+        to_user_id = self.context.get('to_user_id')
+        
+        if to_user_id:
+            try:
+                to_user = User.objects.get(id=to_user_id)
+                attrs['to_user'] = to_user
+            except User.DoesNotExist:
+                raise serializers.ValidationError("User not found")
+        else:
+            to_user = attrs.get('to_user')
+            if not to_user:
+                raise serializers.ValidationError("to_user is required")
         
         if from_user == to_user:
             raise serializers.ValidationError("You cannot rate yourself")
         
-        # Check if user has already rated this user
-        if UserRating.objects.filter(from_user=from_user, to_user=to_user).exists():
-            raise serializers.ValidationError("You have already rated this user")
+        # Get order from request data
+        order_id = attrs.get('order') or self.context.get('order_id')
+        if order_id:
+            from orders.models import Order
+            try:
+                order = Order.objects.get(id=order_id)
+                attrs['order'] = order
+                
+                # Check if user has already rated this user for this specific order
+                existing_rating = UserRating.objects.filter(
+                    from_user=from_user, 
+                    to_user=to_user, 
+                    order=order
+                ).first()
+                if existing_rating:
+                    raise serializers.ValidationError("You have already rated this user for this order")
+                    
+            except Order.DoesNotExist:
+                raise serializers.ValidationError("Order not found")
+        else:
+            raise serializers.ValidationError("Order is required for rating")
         
         attrs['from_user'] = from_user
         return attrs

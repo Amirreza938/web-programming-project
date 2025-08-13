@@ -27,11 +27,16 @@ class OrderListSerializer(serializers.ModelSerializer):
     product = ProductListSerializer(read_only=True)
     seller_name = serializers.CharField(source='seller.username', read_only=True)
     buyer_name = serializers.CharField(source='buyer.username', read_only=True)
+    seller_id = serializers.IntegerField(source='seller.id', read_only=True)
+    buyer_id = serializers.IntegerField(source='buyer.id', read_only=True)
+    seller_profile_image = serializers.ImageField(source='seller.profile_image', read_only=True)
+    buyer_profile_image = serializers.ImageField(source='buyer.profile_image', read_only=True)
     
     class Meta:
         model = Order
         fields = [
             'id', 'order_number', 'product', 'seller_name', 'buyer_name',
+            'seller_id', 'buyer_id', 'seller_profile_image', 'buyer_profile_image',
             'unit_price', 'total_amount', 'status', 'payment_status',
             'shipping_method', 'created_at'
         ]
@@ -71,12 +76,30 @@ class OrderCreateSerializer(serializers.ModelSerializer):
         print(f"[DEBUG] OrderCreateSerializer.validate called with attrs: {attrs}")
         product = attrs['product']
         user = self.context['request'].user
+        accepted_offer = attrs.get('accepted_offer')
         print(f"[DEBUG] Product: {product}, User: {user}")
         
-        # Check if product is available
-        if not product.is_available():
-            print(f"[DEBUG] Product not available: {product.status}")
-            raise serializers.ValidationError("Product is not available for purchase")
+        # Check if product is available OR if user has an accepted offer
+        if accepted_offer:
+            # If creating order from accepted offer, verify the offer belongs to this user and is accepted
+            if accepted_offer.buyer != user:
+                print(f"[DEBUG] Offer doesn't belong to user")
+                raise serializers.ValidationError("This offer doesn't belong to you")
+            if accepted_offer.status != 'accepted':
+                print(f"[DEBUG] Offer not accepted: {accepted_offer.status}")
+                raise serializers.ValidationError("This offer has not been accepted")
+            if accepted_offer.product != product:
+                print(f"[DEBUG] Offer product mismatch")
+                raise serializers.ValidationError("Offer doesn't match the product")
+            # For accepted offers, product must be active (not sold)
+            if product.status != 'active' or not product.is_active:
+                print(f"[DEBUG] Product not active for accepted offer: {product.status}")
+                raise serializers.ValidationError("Product is no longer available")
+        else:
+            # For regular purchases (no offer), check normal availability
+            if not product.is_available():
+                print(f"[DEBUG] Product not available: {product.status}")
+                raise serializers.ValidationError("Product is not available for purchase")
         
         # Check if user is not the seller
         if product.seller == user:

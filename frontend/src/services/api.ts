@@ -58,6 +58,7 @@ export interface Product {
   category: number;
   category_name: string;
   seller: number;
+  seller_id?: number;
   seller_name: string;
   seller_image?: string;
   seller_rating?: number;
@@ -325,6 +326,11 @@ class ApiService {
 
   async getProfile(): Promise<User> {
     const response = await this.api.get('/auth/profile/');
+    return response.data;
+  }
+
+  async getUserProfile(userId: number): Promise<User> {
+    const response = await this.api.get(`/users/profile/${userId}/`);
     return response.data;
   }
 
@@ -751,11 +757,11 @@ class ApiService {
 
   // Order approval methods (for sellers)
   async approveOrder(orderId: number): Promise<void> {
-    await this.api.post(`/orders/${orderId}/approve/`);
+    await this.api.post(`/orders/${orderId}/approve/`, { action: 'approve' });
   }
 
   async rejectOrder(orderId: number): Promise<void> {
-    await this.api.post(`/orders/${orderId}/reject/`);
+    await this.api.post(`/orders/${orderId}/approve/`, { action: 'reject' });
   }
 
   // Product rating methods

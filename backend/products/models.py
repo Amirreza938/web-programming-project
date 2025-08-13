@@ -181,9 +181,8 @@ class Offer(models.Model):
     def accept(self):
         self.status = 'accepted'
         self.save()
-        # Update product status to sold
-        self.product.status = 'sold'
-        self.product.save()
+        # Do NOT update product status to sold here
+        # Product will be marked as sold only when order is approved by seller
     
     def reject(self):
         self.status = 'rejected'

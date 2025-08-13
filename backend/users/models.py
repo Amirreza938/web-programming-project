@@ -122,12 +122,18 @@ class User(AbstractUser):
         
         super().save(*args, **kwargs)
     
-    def update_average_rating(self, new_rating):
-        """Update average rating when a new rating is added"""
-        total_rating = self.average_rating * self.total_ratings + new_rating
-        self.total_ratings += 1
-        self.average_rating = total_rating / self.total_ratings
-        self.save()
+    def update_average_rating(self):
+        """Update average rating based on all received ratings"""
+        from django.db.models import Avg
+        ratings = self.ratings_received.all()
+        if ratings.exists():
+            avg_rating = ratings.aggregate(Avg('rating'))['rating__avg']
+            self.average_rating = round(avg_rating, 1) if avg_rating else 0
+            self.total_ratings = ratings.count()
+        else:
+            self.average_rating = 0
+            self.total_ratings = 0
+        self.save(update_fields=['average_rating', 'total_ratings'])
 
 
 class UserRating(models.Model):
@@ -142,6 +148,11 @@ class UserRating(models.Model):
         on_delete=models.CASCADE, 
         related_name='ratings_received'
     )
+    order = models.ForeignKey(
+        'orders.Order',
+        on_delete=models.CASCADE,
+        related_name='ratings'
+    )
     rating = models.PositiveIntegerField(
         validators=[MinValueValidator(1), MaxValueValidator(5)]
     )
@@ -149,7 +160,7 @@ class UserRating(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     
     class Meta:
-        unique_together = ('from_user', 'to_user')
+        unique_together = ('from_user', 'to_user', 'order')
         db_table = 'user_ratings'
     
     def __str__(self):
@@ -161,7 +172,13 @@ class UserRating(models.Model):
         
         if is_new:
             # Update the recipient's average rating
-            self.to_user.update_average_rating(self.rating)
+            self.to_user.update_average_rating()
+    
+    def delete(self, *args, **kwargs):
+        to_user = self.to_user
+        super().delete(*args, **kwargs)
+        # Update the recipient's average rating after deletion
+        to_user.update_average_rating()
 
 
 class VerificationRequest(models.Model):

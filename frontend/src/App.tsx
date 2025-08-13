@@ -12,6 +12,7 @@ import ProductListPage from './pages/ProductListPage';
 import ProductDetailPage from './pages/ProductDetailPage';
 import CreateProductPage from './pages/CreateProductPage';
 import ProfilePage from './pages/ProfilePage';
+import UserProfilePage from './pages/UserProfilePage';
 import DashboardPage from './pages/DashboardPage';
 import ChatPage from './pages/ChatPage';
 import OrdersPage from './pages/OrdersPage';
@@ -100,6 +101,7 @@ const App: React.FC = () => {
                       </ProtectedRoute>
                     }
                   />
+                  <Route path="/user/:userId" element={<UserProfilePage />} />
                   <Route
                     path="/dashboard"
                     element={

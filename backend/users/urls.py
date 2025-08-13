@@ -18,7 +18,9 @@ urlpatterns = [
     
     # User ratings
     path('ratings/create/', views.UserRatingCreateView.as_view(), name='create-rating'),
-    path('ratings/<int:user_id>/', views.UserRatingListView.as_view(), name='user-ratings'),
+    path('<int:user_id>/rate/', views.UserRatingCreateView.as_view(), name='rate-user'),
+    path('<int:user_id>/ratings/', views.UserRatingListView.as_view(), name='user-ratings'),
+    path('ratings/<int:user_id>/', views.UserRatingListView.as_view(), name='user-ratings-alt'),
     
     # User search
     path('search/', views.UserSearchView.as_view(), name='user-search'),

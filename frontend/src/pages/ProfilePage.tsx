@@ -28,6 +28,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiService } from '../services/api';
 import LoadingSpinner from '../components/common/LoadingSpinner';
+import UserRatingsDisplay from '../components/UserRatingsDisplay';
 
 const ProfilePage: React.FC = () => {
   const { user, updateUser } = useAuth();
@@ -156,7 +157,9 @@ const ProfilePage: React.FC = () => {
                       <HStack spacing={2} color="gray.600">
                         <StarIcon />
                         <Text fontSize="sm">
-                          {user.average_rating || 'No ratings'} ({user.total_ratings || 0} reviews)
+                          {user.average_rating && Number(user.average_rating) > 0 
+                            ? Number(user.average_rating).toFixed(1) 
+                            : 'No ratings'} ({user.total_ratings || 0} reviews)
                         </Text>
                       </HStack>
                       
@@ -356,6 +359,13 @@ const ProfilePage: React.FC = () => {
               </Card>
             </Box>
           </SimpleGrid>
+
+          {/* User Ratings Section */}
+          <Card bg={cardBg} shadow="md">
+            <CardBody>
+              <UserRatingsDisplay userId={user.id} />
+            </CardBody>
+          </Card>
         </VStack>
       </Container>
     </Box>

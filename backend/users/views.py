@@ -2,6 +2,7 @@ from rest_framework import status, generics, permissions
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.exceptions import ValidationError
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import authenticate
 from django.db.models import Q, Count, Sum
@@ -180,8 +181,52 @@ class UserRatingCreateView(generics.CreateAPIView):
     serializer_class = UserRatingSerializer
     permission_classes = [permissions.IsAuthenticated]
     
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        # Add user_id from URL if present
+        if 'user_id' in self.kwargs:
+            context['to_user_id'] = self.kwargs['user_id']
+        # Add order_id from request data
+        order_id = self.request.data.get('order_id') or self.request.data.get('order')
+        if order_id:
+            context['order_id'] = order_id
+        return context
+    
     def perform_create(self, serializer):
-        serializer.save(from_user=self.request.user)
+        from_user = self.request.user
+        to_user_id = self.kwargs.get('user_id') or serializer.validated_data['to_user'].id
+        to_user = serializer.validated_data.get('to_user')
+        order = serializer.validated_data.get('order')
+        
+        # If user_id is in URL, set the to_user
+        if 'user_id' in self.kwargs:
+            try:
+                to_user = User.objects.get(id=to_user_id)
+                serializer.validated_data['to_user'] = to_user
+            except User.DoesNotExist:
+                raise ValidationError("User not found")
+        
+        # Validate that the order exists and involves both users
+        if not order:
+            raise ValidationError("Order is required for rating")
+            
+        # Check if users are part of this specific order and it's completed
+        from orders.models import Order
+        try:
+            order_obj = Order.objects.get(
+                id=order.id,
+                status__in=['delivered'],  # Only allow rating for delivered orders
+            )
+            
+            # Verify that both users are part of this order
+            if not ((order_obj.buyer == from_user and order_obj.seller == to_user) or 
+                    (order_obj.buyer == to_user and order_obj.seller == from_user)):
+                raise ValidationError("You can only rate users from your completed orders")
+                
+        except Order.DoesNotExist:
+            raise ValidationError("Order not found or not eligible for rating")
+        
+        serializer.save(from_user=from_user)
 
 
 class UserRatingListView(generics.ListAPIView):

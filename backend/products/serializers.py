@@ -40,6 +40,7 @@ class ProductImageSerializer(serializers.ModelSerializer):
 
 class ProductListSerializer(serializers.ModelSerializer):
     """Serializer for listing products"""
+    seller_id = serializers.IntegerField(source='seller.id', read_only=True)
     seller_name = serializers.CharField(source='seller.username', read_only=True)
     seller_rating = serializers.SerializerMethodField()
     category_name = serializers.CharField(source='category.name', read_only=True)
@@ -50,7 +51,7 @@ class ProductListSerializer(serializers.ModelSerializer):
         model = Product
         fields = [
             'id', 'title', 'price', 'original_price', 'condition', 'brand', 'model',
-            'location', 'city', 'country', 'seller_name', 'seller_rating',
+            'location', 'city', 'country', 'seller_id', 'seller_name', 'seller_rating',
             'category_name', 'main_image', 'views_count', 'favorites_count',
             'is_negotiable', 'is_favorited', 'created_at'
         ]

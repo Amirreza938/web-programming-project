@@ -34,10 +34,12 @@ import {
   ChatIcon,
   ViewIcon,
   CheckCircleIcon,
+  StarIcon,
 } from '@chakra-ui/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { apiService } from '../services/api';
+import UserRatingModal from '../components/UserRatingModal';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 
 const OrdersPage: React.FC = () => {
@@ -45,10 +47,22 @@ const OrdersPage: React.FC = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const { 
+    isOpen: isRatingOpen, 
+    onOpen: onRatingOpen, 
+    onClose: onRatingClose 
+  } = useDisclosure();
   const cardBg = useColorModeValue('white', 'gray.700');
   
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [disputeMessage, setDisputeMessage] = useState('');
+  const [ratingUser, setRatingUser] = useState<{
+    id: number;
+    name: string;
+    avatar?: string;
+    type: 'buyer' | 'seller';
+    orderId: number;
+  } | null>(null);
 
   // Fetch user orders (as buyer)
   const { data: orders, isLoading: ordersLoading } = useQuery({
@@ -63,14 +77,36 @@ const OrdersPage: React.FC = () => {
   });
 
   // Mutations
-  const updateOrderStatusMutation = useMutation({
-    mutationFn: (data: { orderId: number; status: string }) =>
-      apiService.updateOrderStatus(data.orderId, data.status),
+  const shipOrderMutation = useMutation({
+    mutationFn: (orderId: number) => apiService.shipOrder(orderId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['userOrders'] });
       queryClient.invalidateQueries({ queryKey: ['userSales'] });
       toast({
-        title: 'Order status updated',
+        title: 'Order marked as shipped',
+        status: 'success',
+        duration: 3000,
+        isClosable: true,
+      });
+    },
+    onError: () => {
+      toast({
+        title: 'Error updating order',
+        description: 'Please try again.',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+    },
+  });
+
+  const deliverOrderMutation = useMutation({
+    mutationFn: (orderId: number) => apiService.deliverOrder(orderId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['userOrders'] });
+      queryClient.invalidateQueries({ queryKey: ['userSales'] });
+      toast({
+        title: 'Order marked as delivered',
         status: 'success',
         duration: 3000,
         isClosable: true,
@@ -112,8 +148,12 @@ const OrdersPage: React.FC = () => {
     },
   });
 
-  const handleStatusUpdate = (orderId: number, status: string) => {
-    updateOrderStatusMutation.mutate({ orderId, status });
+  const handleShipOrder = (orderId: number) => {
+    shipOrderMutation.mutate(orderId);
+  };
+
+  const handleDeliverOrder = (orderId: number) => {
+    deliverOrderMutation.mutate(orderId);
   };
 
   const handleCreateDispute = (order: any) => {
@@ -135,6 +175,33 @@ const OrdersPage: React.FC = () => {
       orderId: selectedOrder.id,
       message: disputeMessage,
     });
+  };
+
+  const handleRateUser = (userType: 'buyer' | 'seller', order: any) => {
+    const isRatingSeller = userType === 'seller';
+    const userId = isRatingSeller ? order.seller_id : order.buyer_id;
+    const userName = isRatingSeller ? order.seller_name : order.buyer_name;
+    const userAvatar = isRatingSeller ? order.seller_profile_image : order.buyer_profile_image;
+
+    if (!userId) {
+      toast({
+        title: 'Error',
+        description: 'User information not available',
+        status: 'error',
+        duration: 3000,
+        isClosable: true,
+      });
+      return;
+    }
+
+    setRatingUser({
+      id: userId,
+      name: userName || 'User',
+      avatar: userAvatar,
+      type: userType,
+      orderId: order.id,
+    });
+    onRatingOpen();
   };
 
   const getStatusColor = (status: string) => {
@@ -233,12 +300,12 @@ const OrdersPage: React.FC = () => {
             </HStack>
 
             {/* Seller Actions */}
-            {isSeller && order.status === 'confirmed' && (
+            {isSeller && order.status === 'approved' && (
               <Button
                 size="sm"
                 colorScheme="brand"
-                onClick={() => handleStatusUpdate(order.id, 'shipped')}
-                isLoading={updateOrderStatusMutation.isPending}
+                onClick={() => handleShipOrder(order.id)}
+                isLoading={shipOrderMutation.isPending}
               >
                 Mark Shipped
               </Button>
@@ -249,8 +316,8 @@ const OrdersPage: React.FC = () => {
               <Button
                 size="sm"
                 colorScheme="green"
-                onClick={() => handleStatusUpdate(order.id, 'delivered')}
-                isLoading={updateOrderStatusMutation.isPending}
+                onClick={() => handleDeliverOrder(order.id)}
+                isLoading={deliverOrderMutation.isPending}
               >
                 Mark Delivered
               </Button>
@@ -266,6 +333,37 @@ const OrdersPage: React.FC = () => {
               >
                 Report Issue
               </Button>
+            )}
+
+            {/* Rating Buttons - Show when order is delivered */}
+            {order.status === 'delivered' && (
+              <>
+                {/* Rate Seller Button (for buyers) */}
+                {!isSeller && (
+                  <Button
+                    size="sm"
+                    colorScheme="yellow"
+                    variant="outline"
+                    leftIcon={<StarIcon />}
+                    onClick={() => handleRateUser('seller', order)}
+                  >
+                    Rate Seller
+                  </Button>
+                )}
+                
+                {/* Rate Buyer Button (for sellers) */}
+                {isSeller && (
+                  <Button
+                    size="sm"
+                    colorScheme="yellow"
+                    variant="outline"
+                    leftIcon={<StarIcon />}
+                    onClick={() => handleRateUser('buyer', order)}
+                  >
+                    Rate Buyer
+                  </Button>
+                )}
+              </>
             )}
           </HStack>
         </VStack>
@@ -391,6 +489,19 @@ const OrdersPage: React.FC = () => {
             </ModalBody>
           </ModalContent>
         </Modal>
+
+        {/* User Rating Modal */}
+        {ratingUser && (
+          <UserRatingModal
+            isOpen={isRatingOpen}
+            onClose={onRatingClose}
+            userId={ratingUser.id}
+            userName={ratingUser.name}
+            userAvatar={ratingUser.avatar}
+            userType={ratingUser.type}
+            orderId={ratingUser.orderId}
+          />
+        )}
       </Container>
     </Box>
   );

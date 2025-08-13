@@ -72,10 +72,8 @@ class OrderCreateView(generics.CreateAPIView):
             notification_type='order_created'
         )
         
-        # Update product status only if order was created from an accepted offer
-        if order.accepted_offer:
-            order.product.status = 'sold'
-            order.product.save()
+        # Do NOT update product status here - only when seller approves the order
+        # This allows the product to remain available until seller makes a decision
 
 
 class OrderUpdateView(generics.UpdateAPIView):

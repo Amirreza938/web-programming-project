@@ -290,6 +290,26 @@ const HomePage: React.FC = () => {
                       <Text fontSize="sm" color="gray.600" noOfLines={2}>
                         {product.location}
                       </Text>
+                      <HStack spacing={1} align="center">
+                        <Icon as={StarIcon} boxSize={3} color="yellow.400" />
+                        <Text fontSize="sm" color="gray.600">
+                          {product.seller_rating && Number(product.seller_rating) > 0 
+                            ? Number(product.seller_rating).toFixed(1) 
+                            : 'New'} 
+                          <Text 
+                            as="span" 
+                            color="blue.500" 
+                            cursor="pointer"
+                            _hover={{ textDecoration: 'underline' }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/user/${product.seller_id || product.seller}`);
+                            }}
+                          >
+                            ({product.seller_name})
+                          </Text>
+                        </Text>
+                      </HStack>
                     </VStack>
                   </CardBody>
                 </Card>
@@ -401,6 +421,26 @@ const HomePage: React.FC = () => {
                       <Text fontSize="sm" color="gray.600" noOfLines={2}>
                         {product.location}
                       </Text>
+                      <HStack spacing={1} align="center">
+                        <Icon as={StarIcon} boxSize={3} color="yellow.400" />
+                        <Text fontSize="sm" color="gray.600">
+                          {product.seller_rating && Number(product.seller_rating) > 0 
+                            ? Number(product.seller_rating).toFixed(1) 
+                            : 'New'} 
+                          <Text 
+                            as="span" 
+                            color="blue.500" 
+                            cursor="pointer"
+                            _hover={{ textDecoration: 'underline' }}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              navigate(`/user/${product.seller_id || product.seller}`);
+                            }}
+                          >
+                            ({product.seller_name})
+                          </Text>
+                        </Text>
+                      </HStack>
                     </VStack>
                   </CardBody>
                 </Card>
