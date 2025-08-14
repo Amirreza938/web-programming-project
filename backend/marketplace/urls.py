@@ -23,6 +23,19 @@ from rest_framework_simplejwt.views import (
     TokenRefreshView,
     TokenVerifyView,
 )
+from rest_framework import permissions
+from drf_yasg.views import get_schema_view
+from drf_yasg import openapi
+
+schema_view = get_schema_view(
+    openapi.Info(
+        title="API documentation for second hand store",
+        default_version='v1',
+        description="API docs",
+    ),
+    public=True,
+    permission_classes=[permissions.AllowAny],
+)
 
 urlpatterns = [
     path('admin/', admin.site.urls),
@@ -38,6 +51,11 @@ urlpatterns = [
     path('api/products/', include('products.urls')),
     path('api/chat/', include('chat.urls')),
     path('api/orders/', include('orders.urls')),
+    
+    # api documentation:
+    path('swagger/', schema_view.with_ui('swagger', cache_timeout=0), name='swagger-ui'),
+    path('swagger/output.json', schema_view.without_ui(cache_timeout=0), name='schema-swagger-ui'),
+    
 ]
 
 # Serve media files in development

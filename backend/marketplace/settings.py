@@ -47,6 +47,9 @@ INSTALLED_APPS = [
     'products',
     'chat',
     'orders',
+    
+    # api documentation
+    'drf_yasg',
 ]
 
 MIDDLEWARE = [
