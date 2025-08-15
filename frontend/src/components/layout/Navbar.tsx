@@ -183,6 +183,9 @@ const Navbar: React.FC = () => {
                         <MenuItem onClick={() => navigate('/favorites')}>
                           Favorites
                         </MenuItem>
+                        <MenuItem onClick={() => navigate('/my-reports')}>
+                          My Reports
+                        </MenuItem>
                       </>
                     )}
                     <MenuDivider />
@@ -352,6 +355,16 @@ const Navbar: React.FC = () => {
                           }}
                         >
                           Favorites
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          justifyContent="flex-start"
+                          onClick={() => {
+                            navigate('/my-reports');
+                            onClose();
+                          }}
+                        >
+                          My Reports
                         </Button>
                         <Button
                           variant="ghost"

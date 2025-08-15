@@ -37,12 +37,14 @@ import {
   ViewIcon,
   ChatIcon,
   CalendarIcon,
+  WarningIcon,
 } from '@chakra-ui/icons';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiService } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
 import LoadingSpinner from '../components/common/LoadingSpinner';
+import ProductReportModal from '../components/ProductReportModal';
 
 const ProductDetailPage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
@@ -51,6 +53,11 @@ const ProductDetailPage: React.FC = () => {
   const toast = useToast();
   const queryClient = useQueryClient();
   const { isOpen, onOpen, onClose } = useDisclosure();
+  const { 
+    isOpen: isReportOpen, 
+    onOpen: onReportOpen, 
+    onClose: onReportClose 
+  } = useDisclosure();
   
   const bg = useColorModeValue('white', 'gray.800');
   const cardBg = useColorModeValue('white', 'gray.700');
@@ -384,6 +391,18 @@ const ProductDetailPage: React.FC = () => {
                       </Button>
                     )}
                   </HStack>
+                  
+                  {/* Report Button */}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    colorScheme="red"
+                    leftIcon={<WarningIcon />}
+                    onClick={onReportOpen}
+                    alignSelf="center"
+                  >
+                    Report this Product
+                  </Button>
                 </VStack>
               )}
 
@@ -493,6 +512,14 @@ const ProductDetailPage: React.FC = () => {
             </ModalBody>
           </ModalContent>
         </Modal>
+
+        {/* Product Report Modal */}
+        <ProductReportModal
+          isOpen={isReportOpen}
+          onClose={onReportClose}
+          productId={parseInt(id!)}
+          productTitle={product?.title || ''}
+        />
       </Container>
     </Box>
   );

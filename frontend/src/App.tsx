@@ -18,6 +18,9 @@ import ChatPage from './pages/ChatPage';
 import OrdersPage from './pages/OrdersPage';
 import FavoritesPage from './pages/FavoritesPage';
 import AdminDashboard from './pages/AdminDashboard';
+import AdminProductVerificationPage from './pages/AdminProductVerificationPage';
+import AdminReportManagementPage from './pages/AdminReportManagementPage';
+import MyReportsPage from './pages/MyReportsPage';
 import NotificationsPage from './pages/NotificationsPage';
 import SellerVerificationPage from './pages/SellerVerificationPage';
 import OrderTrackingPage from './pages/OrderTrackingPage';
@@ -147,6 +150,30 @@ const App: React.FC = () => {
                     element={
                       <ProtectedRoute requiresAdmin>
                         <AdminDashboard />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/products/verification"
+                    element={
+                      <ProtectedRoute requiresAdmin>
+                        <AdminProductVerificationPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/admin/reports/management"
+                    element={
+                      <ProtectedRoute requiresAdmin>
+                        <AdminReportManagementPage />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/my-reports"
+                    element={
+                      <ProtectedRoute>
+                        <MyReportsPage />
                       </ProtectedRoute>
                     }
                   />

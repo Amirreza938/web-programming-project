@@ -40,7 +40,9 @@ import {
   StatHelpText,
   StatArrow,
 } from '@chakra-ui/react';
+import { CheckIcon, WarningIcon } from '@chakra-ui/icons';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Link as RouterLink } from 'react-router-dom';
 import { apiService, AdminDashboardStats, VerificationRequest, User } from '../services/api';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 
@@ -213,6 +215,35 @@ const AdminDashboard: React.FC = () => {
               </Card>
             </SimpleGrid>
           )}
+
+          {/* Quick Actions */}
+          <Card>
+            <CardHeader>
+              <Heading size="md">Product & Report Management</Heading>
+            </CardHeader>
+            <CardBody>
+              <SimpleGrid columns={{ base: 1, md: 2 }} spacing={4}>
+                <Button
+                  as={RouterLink}
+                  to="/admin/products/verification"
+                  colorScheme="blue"
+                  size="lg"
+                  leftIcon={<CheckIcon />}
+                >
+                  Product Verification
+                </Button>
+                <Button
+                  as={RouterLink}
+                  to="/admin/reports/management"
+                  colorScheme="orange"
+                  size="lg"
+                  leftIcon={<WarningIcon />}
+                >
+                  Report Management
+                </Button>
+              </SimpleGrid>
+            </CardBody>
+          </Card>
 
           {/* Tabs for different sections */}
           <Tabs variant="enclosed">

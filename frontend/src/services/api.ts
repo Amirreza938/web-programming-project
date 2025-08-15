@@ -78,7 +78,12 @@ export interface Product {
   main_image?: string;
   images?: Array<{ id: number; image: string; is_main: boolean }>;
   is_favorited?: boolean;
-  status: string;
+  status: 'active' | 'sold' | 'expired' | 'inactive' | 'pending_verification';
+  is_verified?: boolean;
+  verified_by?: number;
+  verified_at?: string;
+  verification_notes?: string;
+  rejection_reason?: string;
   created_at: string;
   updated_at: string;
 }
@@ -244,6 +249,54 @@ export interface VerificationRequest {
   reviewed_at?: string;
   created_at: string;
   updated_at: string;
+}
+
+export interface ProductReport {
+  id: number;
+  product: {
+    id: number;
+    title: string;
+    seller: string;
+  };
+  reporter: string;
+  report_type: 'irrelevant' | 'harassment' | 'spam' | 'inappropriate' | 'fake' | 'fraud' | 'duplicate' | 'other';
+  description: string;
+  status: 'pending' | 'reviewed' | 'resolved' | 'dismissed';
+  created_at: string;
+  admin_notes?: string;
+}
+
+export interface PendingProductReport {
+  id: number;
+  product_title: string;
+  report_type: string;
+  description: string;
+  reporter: string;
+  created_at: string;
+}
+
+export interface ProductReport {
+  id: number;
+  product: {
+    id: number;
+    title: string;
+    seller: string;
+  };
+  reporter: string;
+  report_type: 'irrelevant' | 'harassment' | 'spam' | 'inappropriate' | 'fake' | 'fraud' | 'duplicate' | 'other';
+  description: string;
+  status: 'pending' | 'reviewed' | 'resolved' | 'dismissed';
+  created_at: string;
+  admin_notes?: string;
+}
+
+export interface PendingProductReport {
+  id: number;
+  product_title: string;
+  report_type: string;
+  description: string;
+  reporter: string;
+  created_at: string;
 }
 
 class ApiService {
@@ -787,6 +840,44 @@ class ApiService {
         'Content-Type': 'multipart/form-data',
       },
     });
+    return response.data;
+  }
+
+  // Product verification methods (Admin)
+  async getPendingProducts(): Promise<Product[]> {
+    const response = await this.api.get('/users/admin/products/pending/');
+    return response.data;
+  }
+
+  async verifyProduct(productId: number, notes?: string): Promise<{ message: string }> {
+    const response = await this.api.post(`/users/admin/products/${productId}/verify/`, { notes });
+    return response.data;
+  }
+
+  async rejectProduct(productId: number, reason: string): Promise<{ message: string }> {
+    const response = await this.api.post(`/users/admin/products/${productId}/reject/`, { reason });
+    return response.data;
+  }
+
+  // Product reporting methods
+  async reportProduct(productId: number, reportData: { report_type: string; description: string }): Promise<{ message: string; report_id: number }> {
+    const response = await this.api.post(`/products/products/${productId}/report/`, reportData);
+    return response.data;
+  }
+
+  async getMyReports(): Promise<{ results: ProductReport[]; count: number }> {
+    const response = await this.api.get('/products/my-reports/');
+    return response.data;
+  }
+
+  // Admin product report management
+  async getPendingReports(): Promise<PendingProductReport[]> {
+    const response = await this.api.get('/users/admin/reports/pending/');
+    return response.data;
+  }
+
+  async updateReportStatus(reportId: number, action: 'review' | 'resolve' | 'dismiss', notes?: string): Promise<{ message: string }> {
+    const response = await this.api.post(`/users/admin/reports/${reportId}/update/`, { action, notes });
     return response.data;
   }
 }
