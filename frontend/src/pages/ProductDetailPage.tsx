@@ -194,7 +194,7 @@ const ProductDetailPage: React.FC = () => {
     );
   }
 
-  const isOwner = user?.id === product.seller;
+  const isOwner = user && Number(user.id) === Number(product.seller);
 
   return (
     <Box minH="100vh" bg="gray.50" py={8}>
@@ -408,9 +408,13 @@ const ProductDetailPage: React.FC = () => {
 
               {isOwner && (
                 <VStack spacing={4}>
-                  <Text color="gray.600" textAlign="center">
-                    This is your listing
-                  </Text>
+                  <Alert status="info" borderRadius="md">
+                    <AlertIcon />
+                    <VStack align="start" spacing={1}>
+                      <Text fontWeight="semibold">You are viewing your own listing</Text>
+                      <Text fontSize="sm">You can edit or manage this product below.</Text>
+                    </VStack>
+                  </Alert>
                   <HStack spacing={4} w="full">
                     <Button
                       colorScheme="brand"

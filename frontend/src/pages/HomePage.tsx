@@ -328,14 +328,24 @@ const HomePage: React.FC = () => {
       <Box py={16} bg="gray.50">
         <Container maxW="1200px">
           <VStack spacing={8}>
-            <VStack spacing={4} textAlign="center">
-              <Heading as="h2" size="xl">
-                Popular Categories
-              </Heading>
-              <Text fontSize="lg" color="gray.600">
-                Explore items by category
-              </Text>
-            </VStack>
+            <Flex justify="space-between" align="center" w="full">
+              <VStack spacing={4} textAlign="center" flex={1}>
+                <Heading as="h2" size="xl">
+                  Popular Categories
+                </Heading>
+                <Text fontSize="lg" color="gray.600">
+                  Explore items by category
+                </Text>
+              </VStack>
+              <Button
+                rightIcon={<ArrowForwardIcon />}
+                variant="ghost"
+                colorScheme="brand"
+                onClick={() => navigate('/categories')}
+              >
+                View All
+              </Button>
+            </Flex>
 
             <SimpleGrid columns={{ base: 2, md: 3, lg: 4 }} gap={6}>
               {categories?.slice(0, 8).map((category: any) => (
@@ -343,19 +353,57 @@ const HomePage: React.FC = () => {
                   key={category.id}
                   bg={cardBg}
                   shadow="md"
-                  _hover={{ shadow: 'lg', transform: 'translateY(-2px)' }}
-                  transition="all 0.2s"
+                  _hover={{ shadow: 'xl', transform: 'translateY(-4px)' }}
+                  transition="all 0.3s ease"
                   cursor="pointer"
                   onClick={() => navigate(`/products?category=${category.id}`)}
+                  borderRadius="xl"
+                  overflow="hidden"
+                  position="relative"
                 >
-                  <CardBody textAlign="center">
-                    <VStack spacing={3}>
-                      <Text fontSize="lg" fontWeight="semibold">
-                        {category.name}
-                      </Text>
-                      <Text fontSize="sm" color="gray.600">
-                        {category.product_count || 0} items
-                      </Text>
+                  <Box
+                    position="absolute"
+                    top={0}
+                    left={0}
+                    right={0}
+                    h="4px"
+                    bg="linear-gradient(90deg, #667eea 0%, #764ba2 100%)"
+                  />
+                  <CardBody textAlign="center" py={6}>
+                    <VStack spacing={4}>
+                      <Box
+                        w="60px"
+                        h="60px"
+                        borderRadius="full"
+                        bg="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
+                        display="flex"
+                        alignItems="center"
+                        justifyContent="center"
+                        color="white"
+                        fontSize="24px"
+                        fontWeight="bold"
+                      >
+                        {category.name.charAt(0).toUpperCase()}
+                      </Box>
+                      <VStack spacing={1}>
+                        <Text fontSize="lg" fontWeight="bold" color="gray.700">
+                          {category.name}
+                        </Text>
+                        <Badge 
+                          colorScheme="purple" 
+                          variant="subtle" 
+                          borderRadius="full"
+                          px={3}
+                          py={1}
+                        >
+                          {category.products_count || 0} items
+                        </Badge>
+                      </VStack>
+                      {category.description && (
+                        <Text fontSize="sm" color="gray.500" noOfLines={2}>
+                          {category.description}
+                        </Text>
+                      )}
                     </VStack>
                   </CardBody>
                 </Card>

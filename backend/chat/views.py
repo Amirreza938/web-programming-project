@@ -349,8 +349,7 @@ def start_direct_conversation(request, user_id):
             sender=request.user,
             notification_type='message',
             title=f'New message from {request.user.username}',
-            message=f'{request.user.username} sent you a message',
-            related_direct_conversation=conversation
+            message=f'{request.user.username} sent you a message'
         )
     
     return Response({
@@ -380,8 +379,7 @@ class DirectMessageCreateView(generics.CreateAPIView):
             sender=self.request.user,
             notification_type='message',
             title=f'New message from {self.request.user.username}',
-            message=f'You have a new message from {self.request.user.username}',
-            related_direct_conversation=conversation
+            message=f'You have a new message from {self.request.user.username}'
         )
 
 

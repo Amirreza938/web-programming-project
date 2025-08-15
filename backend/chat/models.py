@@ -165,9 +165,12 @@ class DirectConversation(models.Model):
         ).update(is_read=True)
         
         # Also mark related notifications as read
+        # For direct conversations, mark message notifications from the other user as read
+        other_user = self.get_other_user(user)
         Notification.objects.filter(
             recipient=user,
-            related_direct_conversation=self,
+            sender=other_user,
+            notification_type='message',
             is_read=False
         ).update(is_read=True)
     

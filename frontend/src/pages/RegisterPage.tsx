@@ -91,7 +91,59 @@ const RegisterPage: React.FC = () => {
     }
   };
 
+  const isFormValid = () => {
+    // Check all required fields
+    const requiredFields = [
+      'username', 'email', 'password', 'confirmPassword', 
+      'firstName', 'lastName', 'phone', 'address', 
+      'city', 'state', 'zipCode', 'country'
+    ];
+    
+    const hasAllRequiredFields = requiredFields.every(field => 
+      formData[field as keyof typeof formData].trim() !== ''
+    );
+    
+    // Check terms agreement
+    if (!agreedToTerms) return false;
+    
+    // Check password match
+    if (formData.password !== formData.confirmPassword) return false;
+    
+    // Check password length
+    if (formData.password.length < 8) return false;
+    
+    // Check ID card requirement for seller/both
+    if ((formData.userType === 'seller' || formData.userType === 'both')) {
+      if (!idCardFiles || idCardFiles.length < 2) return false;
+    }
+    
+    return hasAllRequiredFields;
+  };
+
   const validateForm = () => {
+    // Check all required fields
+    const requiredFields = [
+      { key: 'username', label: 'Username' },
+      { key: 'email', label: 'Email' },
+      { key: 'password', label: 'Password' },
+      { key: 'confirmPassword', label: 'Confirm Password' },
+      { key: 'firstName', label: 'First Name' },
+      { key: 'lastName', label: 'Last Name' },
+      { key: 'phone', label: 'Phone Number' },
+      { key: 'address', label: 'Address' },
+      { key: 'city', label: 'City' },
+      { key: 'state', label: 'State' },
+      { key: 'zipCode', label: 'ZIP Code' },
+      { key: 'country', label: 'Country' },
+    ];
+    
+    for (const field of requiredFields) {
+      if (!formData[field.key as keyof typeof formData].trim()) {
+        setError(`${field.label} is required`);
+        return false;
+      }
+    }
+    
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match');
       return false;
@@ -177,14 +229,36 @@ const RegisterPage: React.FC = () => {
       
       navigate('/dashboard');
     } catch (err: any) {
-      setError(
-        err.response?.data?.message ||
-        JSON.stringify(err.response?.data) ||
-        'Registration failed. Please try again.'
-      );
+      let errorMessage = 'Registration failed. Please try again.';
+      
+      // Extract user-friendly error message
+      if (err.response?.data) {
+        const errorData = err.response.data;
+        if (typeof errorData === 'string') {
+          errorMessage = errorData;
+        } else if (errorData.message) {
+          errorMessage = errorData.message;
+        } else if (errorData.detail) {
+          errorMessage = errorData.detail;
+        } else if (errorData.error) {
+          errorMessage = errorData.error;
+        } else if (errorData.username) {
+          errorMessage = `Username: ${errorData.username[0]}`;
+        } else if (errorData.email) {
+          errorMessage = `Email: ${errorData.email[0]}`;
+        } else if (errorData.password) {
+          errorMessage = `Password: ${errorData.password[0]}`;
+        } else if (errorData.non_field_errors) {
+          errorMessage = errorData.non_field_errors[0];
+        }
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
+      setError(errorMessage);
       toast({
         title: 'Registration failed',
-        description: err.response?.data?.message || JSON.stringify(err.response?.data) || 'Please check your information and try again.',
+        description: errorMessage,
         status: 'error',
         duration: 5000,
         isClosable: true,
@@ -503,6 +577,7 @@ const RegisterPage: React.FC = () => {
                       w="full"
                       isLoading={isLoading}
                       loadingText="Creating account..."
+                      isDisabled={!isFormValid()}
                     >
                       Create Account
                     </Button>

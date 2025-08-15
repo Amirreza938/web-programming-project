@@ -69,12 +69,16 @@ const ChatPage: React.FC = () => {
   const { data: conversations, isLoading: conversationsLoading } = useQuery({
     queryKey: ['conversations'],
     queryFn: () => apiService.getConversations(),
+    refetchInterval: 3000, // Refetch every 3 seconds for near real-time updates
+    refetchIntervalInBackground: true,
   });
 
   // Fetch direct conversations
   const { data: directConversations, isLoading: directConversationsLoading } = useQuery({
     queryKey: ['directConversations'],
     queryFn: () => apiService.getDirectConversations(),
+    refetchInterval: 3000, // Refetch every 3 seconds for near real-time updates
+    refetchIntervalInBackground: true,
   });
 
   // Fetch users for new chat
@@ -84,18 +88,52 @@ const ChatPage: React.FC = () => {
     enabled: !!searchQuery,
   });
 
+  // Effect to mark conversation as read when selected
+  useEffect(() => {
+    if (selectedConversation) {
+      console.log('Selected conversation changed:', selectedConversation);
+      if (selectedConversation.type === 'product') {
+        // Call conversation detail endpoint to mark as read for product conversations
+        console.log('Marking product conversation as read:', selectedConversation.id);
+        apiService.getConversation(selectedConversation.id).then(() => {
+          console.log('Product conversation marked as read, refreshing list');
+          // After marking as read, refresh the conversations list
+          queryClient.invalidateQueries({ queryKey: ['conversations'] });
+        }).catch(console.error);
+      } else {
+        // For direct conversations, the mark-as-read happens when fetching messages
+        // So we'll refresh the list after a short delay when messages are fetched
+        console.log('Direct conversation selected, will refresh list after delay');
+        const timer = setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ['directConversations'] });
+        }, 500);
+        return () => clearTimeout(timer);
+      }
+    }
+  }, [selectedConversation, queryClient]);
+
   // Fetch messages for selected conversation
   const { data: messages, isLoading: messagesLoading } = useQuery({
     queryKey: ['messages', selectedConversation?.id, selectedConversation?.type],
-    queryFn: () => {
+    queryFn: async () => {
       if (!selectedConversation) return [];
+      
+      let result;
       if (selectedConversation.type === 'direct') {
-        return apiService.getDirectConversationMessages(selectedConversation.id);
+        result = await apiService.getDirectConversationMessages(selectedConversation.id);
+        // Direct message fetching automatically marks as read, so refresh the conversation list
+        setTimeout(() => {
+          queryClient.invalidateQueries({ queryKey: ['directConversations'] });
+        }, 200);
       } else {
-        return apiService.getConversationMessages(selectedConversation.id);
+        result = await apiService.getConversationMessages(selectedConversation.id);
       }
+      
+      return result;
     },
     enabled: !!selectedConversation,
+    refetchInterval: 2000, // Refetch messages every 2 seconds for real-time chat
+    refetchIntervalInBackground: true,
   });
 
   // Send message mutation

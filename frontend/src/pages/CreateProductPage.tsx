@@ -446,22 +446,29 @@ const CreateProductPage: React.FC = () => {
                       </FormControl>
                       <FormControl isRequired>
                         <FormLabel>Shipping Options</FormLabel>
-                        <Select
-                          name="shipping_options"
-                          multiple
-                          value={formData.shipping_options}
-                          onChange={(e) => {
-                            const options = Array.from(e.target.selectedOptions, option => option.value);
-                            setFormData(prev => ({ ...prev, shipping_options: options }));
-                          }}
-                          placeholder="Select shipping options"
-                        >
+                        <VStack align="start" spacing={2}>
                           {shippingOptions.map((option) => (
-                            <option key={option.value} value={option.value}>
+                            <Checkbox
+                              key={option.value}
+                              isChecked={formData.shipping_options.includes(option.value)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    shipping_options: [...prev.shipping_options, option.value]
+                                  }));
+                                } else {
+                                  setFormData(prev => ({
+                                    ...prev,
+                                    shipping_options: prev.shipping_options.filter(opt => opt !== option.value)
+                                  }));
+                                }
+                              }}
+                            >
                               {option.label}
-                            </option>
+                            </Checkbox>
                           ))}
-                        </Select>
+                        </VStack>
                       </FormControl>
                     </SimpleGrid>
 

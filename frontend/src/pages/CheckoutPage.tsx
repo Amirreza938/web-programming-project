@@ -82,7 +82,8 @@ const CheckoutPage: React.FC = () => {
         duration: 5000,
         isClosable: true,
       });
-      navigate(`/orders/${order.id}/tracking`);
+      // Redirect to dashboard instead of order tracking
+      navigate('/dashboard');
     },
     onError: (error: any) => {
       console.error('Order creation failed:', error);
