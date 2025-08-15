@@ -223,3 +223,88 @@ def system_health(request):
         'error_rate': 0.1,    # percentage
         'response_time': 120, # milliseconds
     })
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAdminUser])
+def pending_products(request):
+    """List all products pending admin verification"""
+    from products.models import Product
+    from products.serializers import ProductListSerializer
+
+    products = Product.objects.filter(is_verified=False, status='pending_verification').order_by('-created_at')
+    return Response(ProductListSerializer(products, many=True, context={'request': request}).data)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAdminUser])
+def verify_product(request, product_id):
+    """Admin verifies a product"""
+    from products.models import Product
+    product = Product.objects.filter(id=product_id).first()
+
+    if not product:
+        return Response({'error': 'Product not found'}, status=404)
+
+    product.verify_product(admin_user=request.user, notes=request.data.get('notes'))
+    return Response({'message': 'Product verified successfully'})
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAdminUser])
+def reject_product(request, product_id):
+    """Admin rejects a product"""
+    from products.models import Product
+    product = Product.objects.filter(id=product_id).first()
+
+    if not product:
+        return Response({'error': 'Product not found'}, status=404)
+
+    reason = request.data.get('reason', 'Rejected by admin')
+    product.reject_product(admin_user=request.user, reason=reason)
+    return Response({'message': 'Product rejected successfully'})
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAdminUser])
+def pending_reports(request):
+    """List all product reports pending review"""
+    from products.models import ProductReport
+    reports = ProductReport.objects.filter(status='pending').order_by('-created_at')
+
+    data = []
+    for r in reports:
+        data.append({
+            'id': r.id,
+            'product_title': r.product.title,
+            'report_type': r.get_report_type_display(),
+            'description': r.description,
+            'reporter': r.reporter.username,
+            'created_at': r.created_at,
+        })
+
+    return Response(data)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAdminUser])
+def update_report_status(request, report_id):
+    """Update product report status"""
+    from products.models import ProductReport
+    report = ProductReport.objects.filter(id=report_id).first()
+
+    if not report:
+        return Response({'error': 'Report not found'}, status=404)
+
+    action = request.data.get('action')
+    notes = request.data.get('notes', '')
+
+    if action == 'review':
+        report.mark_reviewed(request.user, notes)
+    elif action == 'resolve':
+        report.resolve(request.user, notes)
+    elif action == 'dismiss':
+        report.dismiss(request.user, notes)
+    else:
+        return Response({'error': 'Invalid action'}, status=400)
+
+    return Response({'message': f'Report {action}d successfully'})

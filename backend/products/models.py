@@ -22,7 +22,7 @@ class Category(models.Model):
         return self.name
     
     def get_products_count(self):
-        return self.products.filter(is_active=True, status='active').count()
+        return self.products.filter(is_active=True, status='active', is_verified=True).count()
 
 
 class Product(models.Model):
@@ -41,6 +41,7 @@ class Product(models.Model):
         ('sold', 'Sold'),
         ('expired', 'Expired'),
         ('inactive', 'Inactive'),
+        ('pending_verification', 'Pending Verification'),  # New status
     ]
     
     # Basic product information
@@ -69,9 +70,20 @@ class Product(models.Model):
     shipping_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0.00)
     
     # Product status
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='active')
+    status = models.CharField(max_length=30, choices=STATUS_CHOICES, default='pending_verification')
     is_active = models.BooleanField(default=True)
     is_featured = models.BooleanField(default=False)
+    
+    # Admin verification fields
+    is_verified = models.BooleanField(default=False, help_text="Whether this product has been verified by an admin")
+    verified_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, 
+                                   related_name='verified_products', 
+                                   help_text="Admin who verified this product")
+    verified_at = models.DateTimeField(null=True, blank=True, help_text="When the product was verified")
+    verification_notes = models.TextField(blank=True, null=True, 
+                                        help_text="Admin notes about the verification")
+    rejection_reason = models.TextField(blank=True, null=True,
+                                      help_text="Reason for rejection if product was rejected")
     
     # Statistics
     views_count = models.PositiveIntegerField(default=0)
@@ -106,7 +118,35 @@ class Product(models.Model):
         return self.images.all().order_by('-is_main', 'created_at')
     
     def is_available(self):
-        return self.status == 'active' and self.is_active
+        """Check if product is available for purchase"""
+        return self.status == 'active' and self.is_active and self.is_verified
+    
+    def is_publicly_visible(self):
+        """Check if product should be visible to regular users"""
+        return self.is_active and self.is_verified and self.status in ['active', 'sold']
+    
+    def verify_product(self, admin_user, notes=None):
+        """Verify the product by an admin"""
+        from django.utils import timezone
+        self.is_verified = True
+        self.verified_by = admin_user
+        self.verified_at = timezone.now()
+        self.verification_notes = notes
+        self.status = 'active'  # Set to active when verified
+        self.rejection_reason = None  # Clear any previous rejection reason
+        self.save(update_fields=['is_verified', 'verified_by', 'verified_at', 
+                                'verification_notes', 'status', 'rejection_reason'])
+    
+    def reject_product(self, admin_user, reason):
+        """Reject the product with a reason"""
+        from django.utils import timezone
+        self.is_verified = False
+        self.verified_by = admin_user
+        self.verified_at = timezone.now()
+        self.status = 'inactive'
+        self.rejection_reason = reason
+        self.save(update_fields=['is_verified', 'verified_by', 'verified_at', 
+                                'status', 'rejection_reason'])
     
     def update_rating(self):
         """Update product average rating based on all ratings"""
@@ -179,6 +219,9 @@ class Offer(models.Model):
         return f"${self.amount} offer by {self.buyer.username} for {self.product.title}"
     
     def accept(self):
+        # Only allow accepting offers for verified products
+        if not self.product.is_verified:
+            raise ValueError("Cannot accept offers for unverified products")
         self.status = 'accepted'
         self.save()
         # Do NOT update product status to sold here
@@ -203,6 +246,10 @@ class Favorite(models.Model):
         return f"{self.user.username} favorited {self.product.title}"
     
     def save(self, *args, **kwargs):
+        # Only allow favoriting verified products
+        if not self.product.is_verified:
+            raise ValueError("Cannot favorite unverified products")
+            
         is_new = self.pk is None
         super().save(*args, **kwargs)
         
@@ -236,6 +283,10 @@ class ProductRating(models.Model):
         return f"{self.user.username} rated {self.product.title} - {self.rating} stars"
     
     def save(self, *args, **kwargs):
+        # Only allow rating verified products
+        if not self.product.is_verified:
+            raise ValueError("Cannot rate unverified products")
+            
         is_new = self.pk is None
         super().save(*args, **kwargs)
         
@@ -247,3 +298,70 @@ class ProductRating(models.Model):
         super().delete(*args, **kwargs)
         # Update product average rating
         self.product.update_rating()
+        
+        
+class ProductReport(models.Model):
+    """User reports for product issues"""
+    REPORT_TYPES = [
+        ('irrelevant', 'Irrelevant Product'),
+        ('harassment', 'Harassment'),
+        ('spam', 'Spam'),
+        ('inappropriate', 'Inappropriate Content'),
+        ('fake', 'Fake Product'),
+        ('fraud', 'Fraud/Scam'),
+        ('duplicate', 'Duplicate Listing'),
+        ('other', 'Other'),
+    ]
+    
+    STATUS_CHOICES = [
+        ('pending', 'Pending'),
+        ('reviewed', 'Reviewed'),
+        ('resolved', 'Resolved'),
+        ('dismissed', 'Dismissed'),
+    ]
+    
+    reporter = models.ForeignKey(User, on_delete=models.CASCADE, related_name='reports_made')
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name='reports')
+    report_type = models.CharField(max_length=20, choices=REPORT_TYPES)
+    description = models.TextField(help_text="Please describe the issue")
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    
+    # Admin fields
+    reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True,
+                                   related_name='reports_reviewed')
+    admin_notes = models.TextField(blank=True, null=True, help_text="Admin notes about this report")
+    
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        unique_together = ('reporter', 'product')  # One report per user per product
+        db_table = 'product_reports'
+        ordering = ['-created_at']
+    
+    def __str__(self):
+        return f"{self.get_report_type_display()} report by {self.reporter.username} for {self.product.title}"
+    
+    def mark_reviewed(self, admin_user, notes=None):
+        """Mark report as reviewed by admin"""
+        self.status = 'reviewed'
+        self.reviewed_by = admin_user
+        if notes:
+            self.admin_notes = notes
+        self.save(update_fields=['status', 'reviewed_by', 'admin_notes', 'updated_at'])
+    
+    def resolve(self, admin_user, notes=None):
+        """Mark report as resolved"""
+        self.status = 'resolved'
+        self.reviewed_by = admin_user
+        if notes:
+            self.admin_notes = notes
+        self.save(update_fields=['status', 'reviewed_by', 'admin_notes', 'updated_at'])
+    
+    def dismiss(self, admin_user, notes=None):
+        """Dismiss the report"""
+        self.status = 'dismissed'
+        self.reviewed_by = admin_user
+        if notes:
+            self.admin_notes = notes
+        self.save(update_fields=['status', 'reviewed_by', 'admin_notes', 'updated_at'])

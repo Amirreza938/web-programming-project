@@ -5,13 +5,13 @@ from rest_framework.views import APIView
 from django_filters.rest_framework import DjangoFilterBackend
 from django.db.models import Q, Count, Avg
 from django.shortcuts import get_object_or_404
-from .models import Category, Product, ProductImage, Offer, Favorite
+from users.views import CanSellPermission, CanBuyPermission
+from .models import Category, Product, Offer, Favorite, ProductRating, ProductReport
 from .serializers import (
     CategorySerializer, ProductListSerializer, ProductDetailSerializer,
     ProductCreateSerializer, ProductUpdateSerializer, OfferSerializer,
     OfferListSerializer, FavoriteSerializer, ProductSearchSerializer
 )
-from users.views import CanSellPermission, CanBuyPermission
 
 
 class CategoryListView(generics.ListAPIView):
@@ -43,7 +43,8 @@ class ProductListCreateView(generics.ListCreateAPIView):
         return [permissions.AllowAny()]
 
     def get_queryset(self):
-        queryset = Product.objects.filter(is_active=True, status='active')
+        # Only show verified products to regular users
+        queryset = Product.objects.filter(is_active=True, status='active', is_verified=True)
         
         # Price filtering
         min_price = self.request.query_params.get('min_price')
@@ -75,19 +76,30 @@ class ProductListCreateView(generics.ListCreateAPIView):
             from rest_framework.exceptions import PermissionDenied
             raise PermissionDenied("You don't have permission to create listings")
         
+        # Save product with pending verification status
         serializer.save(seller=self.request.user)
 
 
 class ProductDetailView(generics.RetrieveAPIView):
     """Get product details"""
-    queryset = Product.objects.filter(is_active=True)
     serializer_class = ProductDetailSerializer
     permission_classes = [permissions.AllowAny]
     
+    def get_queryset(self):
+        # Show verified products to everyone, but allow sellers to see their own unverified products
+        if self.request.user.is_authenticated:
+            return Product.objects.filter(
+                Q(is_active=True, is_verified=True) | 
+                Q(seller=self.request.user, is_active=True)
+            )
+        else:
+            return Product.objects.filter(is_active=True, is_verified=True)
+    
     def retrieve(self, request, *args, **kwargs):
         instance = self.get_object()
-        # Increment view count
-        instance.increment_views()
+        # Only increment view count for verified products
+        if instance.is_verified:
+            instance.increment_views()
         serializer = self.get_serializer(instance)
         return Response(serializer.data)
 
@@ -120,9 +132,11 @@ class UserProductsView(generics.ListAPIView):
     
     def get_queryset(self):
         user_id = self.kwargs.get('user_id')
+        # Only show verified products to public
         return Product.objects.filter(
             seller_id=user_id, 
-            is_active=True
+            is_active=True,
+            is_verified=True
         ).order_by('-created_at')
 
 
@@ -134,6 +148,7 @@ class MyProductsView(generics.ListAPIView):
     def get_queryset(self):
         print("[DEBUG] MyProductsView user:", self.request.user)
         print("[DEBUG] MyProductsView headers:", dict(self.request.headers))
+        # Show all products to the owner (verified and unverified)
         return Product.objects.filter(
             seller=self.request.user
         ).order_by('-created_at')
@@ -375,12 +390,12 @@ def toggle_favorite(request, product_id):
     except Favorite.DoesNotExist:
         # Product is not favorited, add it
         try:
-            product = Product.objects.get(id=product_id)
+            product = Product.objects.get(id=product_id, is_verified=True)  # Only allow favoriting verified products
             Favorite.objects.create(user=request.user, product=product)
             return Response({'message': 'Product added to favorites', 'is_favorited': True})
         except Product.DoesNotExist:
             return Response(
-                {'error': 'Product not found'}, 
+                {'error': 'Product not found or not available'}, 
                 status=status.HTTP_404_NOT_FOUND
             )
 
@@ -393,7 +408,8 @@ def search_products(request):
     if serializer.is_valid():
         data = serializer.validated_data
         
-        queryset = Product.objects.filter(is_active=True, status='active')
+        # Only search verified products
+        queryset = Product.objects.filter(is_active=True, status='active', is_verified=True)
         
         # Text search
         if data.get('query'):
@@ -453,7 +469,8 @@ def featured_products(request):
     products = Product.objects.filter(
         is_active=True, 
         status='active', 
-        is_featured=True
+        is_featured=True,
+        is_verified=True  # Only show verified featured products
     ).order_by('-created_at')[:10]
     
     serializer = ProductListSerializer(products, many=True, context={'request': request})
@@ -471,7 +488,8 @@ def popular_products(request):
     """Get popular products based on views"""
     products = Product.objects.filter(
         is_active=True, 
-        status='active'
+        status='active',
+        is_verified=True  # Only show verified popular products
     ).order_by('-views_count')[:10]
     
     serializer = ProductListSerializer(products, many=True, context={'request': request})
@@ -485,7 +503,8 @@ def category_products(request, category_id):
     products = Product.objects.filter(
         category_id=category_id,
         is_active=True,
-        status='active'
+        status='active',
+        is_verified=True  # Only show verified products in category
     ).order_by('-created_at')
     
     serializer = ProductListSerializer(products, many=True, context={'request': request})
@@ -497,7 +516,7 @@ def category_products(request, category_id):
 def create_product_rating(request, product_id):
     """Create a rating for a product"""
     try:
-        product = Product.objects.get(id=product_id)
+        product = Product.objects.get(id=product_id, is_verified=True)  # Only allow rating verified products
         
         # Check if user is trying to rate their own product
         if product.seller == request.user:
@@ -507,7 +526,6 @@ def create_product_rating(request, product_id):
             )
         
         # Check if user has already rated this product
-        from .models import ProductRating
         existing_rating = ProductRating.objects.filter(
             user=request.user,
             product=product
@@ -553,7 +571,7 @@ def create_product_rating(request, product_id):
             
     except Product.DoesNotExist:
         return Response(
-            {'error': 'Product not found'}, 
+            {'error': 'Product not found or not available for rating'}, 
             status=status.HTTP_404_NOT_FOUND
         )
     except Exception as e:
@@ -567,8 +585,7 @@ def create_product_rating(request, product_id):
 def get_product_ratings(request, product_id):
     """Get all ratings for a product"""
     try:
-        product = Product.objects.get(id=product_id)
-        from .models import ProductRating
+        product = Product.objects.get(id=product_id, is_verified=True)  # Only show ratings for verified products
         ratings = ProductRating.objects.filter(product=product).order_by('-created_at')
         
         ratings_data = []
@@ -593,3 +610,84 @@ def get_product_ratings(request, product_id):
             {'error': 'Product not found'}, 
             status=status.HTTP_404_NOT_FOUND
         )
+
+
+# NEW VIEWS FOR PRODUCT REPORTING
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def report_product(request, product_id):
+    """Report a product for issues"""
+    try:
+        product = Product.objects.get(id=product_id)
+        
+        # Check if user is trying to report their own product
+        if product.seller == request.user:
+            return Response(
+                {'error': 'You cannot report your own product'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Check if user has already reported this product
+        existing_report = ProductReport.objects.filter(
+            reporter=request.user,
+            product=product
+        ).first()
+        
+        if existing_report:
+            return Response(
+                {'error': 'You have already reported this product'}, 
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # Create new report
+        report = ProductReport.objects.create(
+            reporter=request.user,
+            product=product,
+            report_type=request.data.get('report_type'),
+            description=request.data.get('description', '')
+        )
+        
+        return Response({
+            'message': 'Product reported successfully',
+            'report_id': report.id
+        }, status=status.HTTP_201_CREATED)
+        
+    except Product.DoesNotExist:
+        return Response(
+            {'error': 'Product not found'}, 
+            status=status.HTTP_404_NOT_FOUND
+        )
+    except Exception as e:
+        return Response(
+            {'error': str(e)}, 
+            status=status.HTTP_400_BAD_REQUEST
+        )
+
+
+@api_view(['GET'])
+@permission_classes([permissions.IsAuthenticated])
+def my_reports(request):
+    """Get current user's reports"""
+    reports = ProductReport.objects.filter(reporter=request.user).order_by('-created_at')
+    
+    reports_data = []
+    for report in reports:
+        reports_data.append({
+            'id': report.id,
+            'product': {
+                'id': report.product.id,
+                'title': report.product.title,
+                'seller': report.product.seller.username
+            },
+            'report_type': report.get_report_type_display(),
+            'description': report.description,
+            'status': report.get_status_display(),
+            'created_at': report.created_at.isoformat(),
+            'admin_notes': report.admin_notes if report.status != 'pending' else None
+        })
+    
+    return Response({
+        'results': reports_data,
+        'count': len(reports_data)
+    })

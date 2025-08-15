@@ -37,4 +37,8 @@ urlpatterns = [
     path('search/', views.search_products, name='search-products'),
     path('featured/', views.featured_products, name='featured-products'),
     path('popular/', views.popular_products, name='popular-products'),
+    
+    # report URL patterns
+    path('products/<int:product_id>/report/', views.report_product, name='report_product'),
+    path('my-reports/', views.my_reports, name='my_reports'),
 ]

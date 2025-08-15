@@ -1,5 +1,9 @@
 from django.urls import path
 from . import views
+from .admin_views import (
+    pending_products, verify_product, reject_product,
+    pending_reports, update_report_status
+)
 
 urlpatterns = [
     # Authentication
@@ -37,4 +41,12 @@ urlpatterns = [
     path('admin/users/', views.users_list, name='admin-users-list'),
     path('admin/approve-user/<int:user_id>/', views.approve_user, name='approve-user'),
     path('admin/reject-user/<int:user_id>/', views.reject_user, name='reject-user'),
+    
+    
+    # adming to control reports and the products
+    path('admin/products/pending/', pending_products),
+    path('admin/products/<int:product_id>/verify/', verify_product),
+    path('admin/products/<int:product_id>/reject/', reject_product),
+    path('admin/reports/pending/', pending_reports),
+    path('admin/reports/<int:report_id>/update/', update_report_status),
 ]
