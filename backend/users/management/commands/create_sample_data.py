@@ -1,302 +1,282 @@
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
 from django.db import transaction
-from products.models import Category, Product, ProductImage
-from orders.models import ShippingMethod
+from django.utils import timezone
 from decimal import Decimal
+import random
+
+from products.models import Category, Product, ProductImage  # matches your models
+# Optional: seed shipping methods if the orders app exists
+try:
+    from orders.models import ShippingMethod  # type: ignore
+    HAS_ORDERS = True
+except Exception:
+    HAS_ORDERS = False
 
 User = get_user_model()
 
 
+def _rand_image_urls(n=1):
+    # picsum has stable, hotlink-friendly placeholders
+    ids = random.sample(range(100, 1200), k=n)
+    return [f"https://picsum.photos/id/{i}/1200/800" for i in ids]
+
+
 class Command(BaseCommand):
-    help = 'Create sample data for the marketplace'
+    help = "Seed admin, users, categories, (optional) shipping methods, and VERIFIED products compatible with current models."
+
+    def add_arguments(self, parser):
+        parser.add_argument("--sellers", type=int, default=3, help="How many seller accounts to create.")
+        parser.add_argument("--buyers", type=int, default=2, help="How many buyer accounts to create.")
+        parser.add_argument("--products", type=int, default=15, help="How many products to create (spread across sellers).")
+        parser.add_argument("--reset", action="store_true", help="If set, will not delete data (safe). Present just for parity; does nothing destructive.")
 
     def handle(self, *args, **options):
-        self.stdout.write('Creating sample data...')
-        
+        sellers_n = options["sellers"]
+        buyers_n = options["buyers"]
+        products_n = options["products"]
+
+        self.stdout.write(self.style.WARNING("Seeding data…"))
         with transaction.atomic():
-            # Create sample users
-            self.create_sample_users()
-            
-            # Create sample categories
-            self.create_sample_categories()
-            
-            # Create sample shipping methods
-            self.create_sample_shipping_methods()
-            
-            # Create sample products
-            self.create_sample_products()
-        
-        self.stdout.write(self.style.SUCCESS('Sample data created successfully!'))
+            admin = self._ensure_admin()
+            sellers = self._ensure_sellers(sellers_n)
+            buyers = self._ensure_buyers(buyers_n)
+            cats = self._ensure_categories()
+            if HAS_ORDERS:
+                self._ensure_shipping_methods()
+            self._ensure_products(products_n, admin, sellers, cats)
 
-    def create_sample_users(self):
-        """Create sample users"""
-        users_data = [
-            {
-                'username': 'john_doe',
-                'email': 'john@example.com',
-                'first_name': 'John',
-                'last_name': 'Doe',
-                'user_type': 'both',
-                'phone_number': '+1234567890',
-                'address': '123 Main St',
-                'city': 'New York',
-                'country': 'USA',
-                'postal_code': '10001',
-                'is_active_seller': True,
-                'verification_status': 'verified'
-            },
-            {
-                'username': 'jane_smith',
-                'email': 'jane@example.com',
-                'first_name': 'Jane',
-                'last_name': 'Smith',
-                'user_type': 'both',
-                'phone_number': '+1234567891',
-                'address': '456 Oak Ave',
-                'city': 'Los Angeles',
-                'country': 'USA',
-                'postal_code': '90210',
-                'is_active_seller': True,
-                'verification_status': 'verified'
-            },
-            {
-                'username': 'mike_buyer',
-                'email': 'mike@example.com',
-                'first_name': 'Mike',
-                'last_name': 'Johnson',
-                'user_type': 'buyer',
-                'phone_number': '+1234567892',
-                'address': '789 Pine St',
-                'city': 'Chicago',
-                'country': 'USA',
-                'postal_code': '60601'
-            }
-        ]
-        
-        for user_data in users_data:
+        self.stdout.write(self.style.SUCCESS("✓ Done."))
+
+    # --- helpers -------------------------------------------------------------
+
+    def _ensure_admin(self):
+        """
+        Create/ensure a superuser aligned with your User model defaults:
+        user_type='admin', account_approved=True, verification_status='not_required'.
+        """
+        admin, created = User.objects.get_or_create(
+            username="admin",
+            defaults=dict(
+                email="admin@example.com",
+                first_name="Admin",
+                last_name="User",
+                user_type="admin",
+                account_approved=True,
+                verification_status="not_required",
+                is_staff=True,
+                is_superuser=True,
+            ),
+        )
+        if created:
+            admin.set_password("admin123")
+            admin.save()
+            self.stdout.write(self.style.SUCCESS("Created superuser: admin / admin123"))
+        else:
+            # keep flags consistent
+            changed = False
+            desired = dict(
+                user_type="admin",
+                account_approved=True,
+                verification_status="not_required",
+                is_staff=True,
+                is_superuser=True,
+            )
+            for k, v in desired.items():
+                if getattr(admin, k) != v:
+                    setattr(admin, k, v)
+                    changed = True
+            if changed:
+                admin.save()
+                self.stdout.write(self.style.SUCCESS("Updated existing admin flags."))
+            else:
+                self.stdout.write("Admin already exists.")
+        return admin
+
+    def _ensure_sellers(self, n):
+        """
+        Make verified & approved sellers to satisfy Product.seller FK and your can_sell()
+        (user_type in ['seller','both'] + account_approved=True + verification_status='verified').
+        """
+        sellers = []
+        cities = [("Berlin", "Germany"), ("Munich", "Germany"), ("Hamburg", "Germany"), ("Cologne", "Germany")]
+        for i in range(n):
+            username = f"seller{i+1}"
+            city, country = random.choice(cities)
             user, created = User.objects.get_or_create(
-                username=user_data['username'],
-                defaults=user_data
+                username=username,
+                defaults=dict(
+                    email=f"{username}@example.com",
+                    first_name=f"Seller{i+1}",
+                    last_name="User",
+                    user_type="both",
+                    phone_number=f"+49176{random.randint(1000000, 9999999)}",
+                    city=city,
+                    country=country,
+                    account_approved=True,
+                    verification_status="verified",
+                    is_active_seller=True,
+                ),
             )
             if created:
-                user.set_password('password123')
+                user.set_password("password123")
                 user.save()
-                self.stdout.write(f'Created user: {user.username}')
+                self.stdout.write(f"Created seller: {user.username}")
+            sellers.append(user)
+        return sellers
 
-    def create_sample_categories(self):
-        """Create sample categories"""
-        categories_data = [
-            {
-                'name': 'Electronics',
-                'description': 'Electronic devices and gadgets'
-            },
-            {
-                'name': 'Clothing',
-                'description': 'Fashion and apparel'
-            },
-            {
-                'name': 'Home & Garden',
-                'description': 'Home improvement and gardening items'
-            },
-            {
-                'name': 'Sports & Outdoors',
-                'description': 'Sports equipment and outdoor gear'
-            },
-            {
-                'name': 'Books & Media',
-                'description': 'Books, movies, and music'
-            },
-            {
-                'name': 'Automotive',
-                'description': 'Car parts and accessories'
-            }
-        ]
-        
-        for cat_data in categories_data:
-            category, created = Category.objects.get_or_create(
-                name=cat_data['name'],
-                defaults=cat_data
+    def _ensure_buyers(self, n):
+        buyers = []
+        cities = [("Berlin", "Germany"), ("Frankfurt", "Germany"), ("Stuttgart", "Germany")]
+        for i in range(n):
+            username = f"buyer{i+1}"
+            city, country = random.choice(cities)
+            user, created = User.objects.get_or_create(
+                username=username,
+                defaults=dict(
+                    email=f"{username}@example.com",
+                    first_name=f"Buyer{i+1}",
+                    last_name="User",
+                    user_type="buyer",
+                    phone_number=f"+49175{random.randint(1000000, 9999999)}",
+                    city=city,
+                    country=country,
+                    # your User.save() sets buyer: verification_status='not_required', account_approved=True
+                ),
             )
             if created:
-                self.stdout.write(f'Created category: {category.name}')
+                user.set_password("password123")
+                user.save()
+                self.stdout.write(f"Created buyer: {user.username}")
+            buyers.append(user)
+        return buyers
 
-    def create_sample_shipping_methods(self):
-        """Create sample shipping methods"""
-        shipping_methods_data = [
-            {
-                'name': 'Standard Shipping',
-                'description': '5-7 business days',
-                'base_cost': Decimal('5.99'),
-                'estimated_days': 7
-            },
-            {
-                'name': 'Express Shipping',
-                'description': '2-3 business days',
-                'base_cost': Decimal('12.99'),
-                'estimated_days': 3
-            },
-            {
-                'name': 'Overnight Shipping',
-                'description': 'Next business day',
-                'base_cost': Decimal('24.99'),
-                'estimated_days': 1
-            },
-            {
-                'name': 'Local Pickup',
-                'description': 'Pick up from seller location',
-                'base_cost': Decimal('0.00'),
-                'estimated_days': 0
-            }
+    def _ensure_categories(self):
+        rows = [
+            ("Electronics", "Devices and gadgets"),
+            ("Clothing", "Fashion and apparel"),
+            ("Home & Garden", "Home improvement and gardening"),
+            ("Sports & Outdoors", "Sports equipment and outdoor gear"),
+            ("Books & Media", "Books, movies, and music"),
+            ("Automotive", "Car parts and accessories"),
         ]
-        
-        for method_data in shipping_methods_data:
-            method, created = ShippingMethod.objects.get_or_create(
-                name=method_data['name'],
-                defaults=method_data
-            )
+        cats = {}
+        for name, desc in rows:
+            cat, created = Category.objects.get_or_create(name=name, defaults={"description": desc})
             if created:
-                self.stdout.write(f'Created shipping method: {method.name}')
+                self.stdout.write(f"Created category: {name}")
+            cats[name] = cat
+        return cats
 
-    def create_sample_products(self):
-        """Create sample products"""
-        # Get users and categories
-        john = User.objects.get(username='john_doe')
-        jane = User.objects.get(username='jane_smith')
-        electronics = Category.objects.get(name='Electronics')
-        clothing = Category.objects.get(name='Clothing')
-        home = Category.objects.get(name='Home & Garden')
-        
-        products_data = [
-            {
-                'seller': john,
-                'category': electronics,
-                'title': 'iPhone 12 Pro - Excellent Condition',
-                'description': 'iPhone 12 Pro in excellent condition. 128GB, Pacific Blue. Includes original box and charger. No scratches or damage.',
-                'condition': 'like_new',
-                'brand': 'Apple',
-                'model': 'iPhone 12 Pro',
-                'price': Decimal('699.99'),
-                'original_price': Decimal('999.99'),
-                'is_negotiable': True,
-                'location': '123 Main St, New York, NY',
-                'city': 'New York',
-                'country': 'USA',
-                'shipping_options': ['post', 'pickup'],
-                'shipping_cost': Decimal('15.00'),
-                'images': [
-                    'product_images/iphone-12-pro-gold-1.jpg',
-                ]
-            },
-            {
-                'seller': john,
-                'category': electronics,
-                'title': 'MacBook Air M1 - Good Condition',
-                'description': 'MacBook Air with M1 chip. 8GB RAM, 256GB SSD. Some minor wear but works perfectly. Great for work or school.',
-                'condition': 'good',
-                'brand': 'Apple',
-                'model': 'MacBook Air M1',
-                'price': Decimal('799.99'),
-                'original_price': Decimal('1299.99'),
-                'is_negotiable': True,
-                'location': '123 Main St, New York, NY',
-                'city': 'New York',
-                'country': 'USA',
-                'shipping_options': ['post', 'pickup'],
-                'shipping_cost': Decimal('25.00'),
-                'images': [
-                    'product_images/mac_book.jpg',
-                ]
-            },
-            {
-                'seller': jane,
-                'category': clothing,
-                'title': 'Designer Handbag - Louis Vuitton',
-                'description': 'Authentic Louis Vuitton handbag. Neverfull MM size. Brown monogram canvas. Includes dust bag.',
-                'condition': 'like_new',
-                'brand': 'Louis Vuitton',
-                'model': 'Neverfull MM',
-                'price': Decimal('899.99'),
-                'original_price': Decimal('1499.99'),
-                'is_negotiable': False,
-                'location': '456 Oak Ave, Los Angeles, CA',
-                'city': 'Los Angeles',
-                'country': 'USA',
-                'shipping_options': ['post', 'pickup'],
-                'shipping_cost': Decimal('20.00'),
-                'images': [
-                    'product_images/louis.jpg',
-                ]
-            },
-            {
-                'seller': jane,
-                'category': home,
-                'title': 'Vintage Coffee Table',
-                'description': 'Beautiful vintage coffee table. Solid wood construction. Perfect condition. Great for living room.',
-                'condition': 'good',
-                'brand': 'Vintage',
-                'model': 'Coffee Table',
-                'price': Decimal('299.99'),
-                'original_price': Decimal('450.00'),
-                'is_negotiable': True,
-                'location': '456 Oak Ave, Los Angeles, CA',
-                'city': 'Los Angeles',
-                'country': 'USA',
-                'shipping_options': ['pickup'],
-                'shipping_cost': Decimal('0.00'),
-                'images': [
-                    'product_images/table.jpg',
-                ]
-            },
-            {
-                'seller': john,
-                'category': electronics,
-                'title': 'Sony WH-1000XM4 Headphones',
-                'description': 'Sony noise-canceling headphones. Excellent sound quality. Includes carrying case and cables.',
-                'condition': 'like_new',
-                'brand': 'Sony',
-                'model': 'WH-1000XM4',
-                'price': Decimal('249.99'),
-                'original_price': Decimal('349.99'),
-                'is_negotiable': True,
-                'location': '123 Main St, New York, NY',
-                'city': 'New York',
-                'country': 'USA',
-                'shipping_options': ['post', 'pickup'],
-                'shipping_cost': Decimal('10.00'),
-                'images': [
-                    'product_images/sony.jpg',
-                ]
-            }
+    def _ensure_shipping_methods(self):
+        data = [
+            ("Standard Shipping", "5–7 business days", Decimal("5.99"), 7),
+            ("Express Shipping", "2–3 business days", Decimal("12.99"), 3),
+            ("Overnight", "Next business day", Decimal("24.99"), 1),
+            ("Local Pickup", "Pick up from seller", Decimal("0.00"), 0),
         ]
-        
-        for product_data in products_data:
-            images = product_data.pop('images', [])
+        for name, desc, cost, days in data:
+            ShippingMethod.objects.get_or_create(
+                name=name,
+                defaults={"description": desc, "base_cost": cost, "estimated_days": days},
+            )
+
+    def _ensure_products(self, n, admin, sellers, cats):
+        """
+        Create n products spread across sellers; each product is VERIFIED+ACTIVE and
+        has at least one ProductImage via image_url (no local media).
+        """
+        titles_by_cat = {
+            "Electronics": [
+                "iPhone 12 Pro 128GB", "Samsung Galaxy S21", "MacBook Air M1",
+                "Sony WH-1000XM4", "GoPro HERO9", "Kindle Paperwhite",
+                "Dell XPS 13", "iPad Pro 11", "Canon EOS R", "Nikon D750",
+                "Surface Pro 7", "Galaxy Tab S7", "PS5 Console", "Xbox Series X",
+                "Apple Watch Series 7", "Fitbit Versa 3", "JBL Bluetooth Speaker",
+                "Raspberry Pi 4", "Nintendo Switch OLED", "DJI Mavic Mini"
+            ],
+            "Clothing": [
+                "Leather Jacket (L)", "Running Shoes EU 43", "Winter Parka (M)",
+                "Designer Jeans (32/32)", "T-Shirt Pack (M)", "Wool Sweater (XL)",
+                "Baseball Cap", "Hiking Boots (45)", "Raincoat (L)",
+                "Formal Suit (50R)", "Evening Dress (S)", "Sneakers (EU 41)"
+            ],
+            "Home & Garden": [
+                "Vintage Coffee Table", "Desk Lamp", "Air Purifier", "Electric Kettle",
+                "Microwave Oven", "Blender 700W", "Vacuum Cleaner", "Wall Clock",
+                "Bookshelf", "Office Chair", "Garden Hose 20m", "Patio Umbrella"
+            ],
+            "Sports & Outdoors": [
+                "Mountain Bike Helmet", "Yoga Mat", "Camping Tent 2P",
+                "Sleeping Bag", "Hiking Backpack 60L", "Tennis Racket",
+                "Football", "Basketball", "Climbing Shoes", "Fishing Rod",
+                "Kayak Paddle", "Ski Goggles"
+            ],
+            "Books & Media": [
+                "Django for APIs (Book)", "Inception Blu-ray", "Guitar Starter Kit",
+                "The Pragmatic Programmer", "Clean Code", "Harry Potter Set",
+                "Lord of the Rings Box", "Star Wars DVD Collection",
+                "Pink Floyd Vinyl", "Beethoven Symphony CD"
+            ],
+            "Automotive": [
+                "All-Season Tires (Set of 4)", "Car Phone Holder", "OBD-II Scanner",
+                "Roof Rack", "Motor Oil 5L", "LED Headlights", "Car Battery Charger",
+                "Dash Cam", "Seat Covers Set", "Floor Mats Rubber",
+                "Alloy Wheels", "Car Vacuum Cleaner"
+            ],
+        }
+
+
+        conditions = ["new", "like_new", "good", "fair", "poor", "needs_repair"]
+        shipping_pool = [["post"], ["pickup"], ["post", "pickup"], ["post", "delivery"], ["delivery"]]
+        brands = ["Apple", "Samsung", "Sony", "Ikea", "Bosch", "Adidas", "Nike", "Generic"]
+
+        all_cats = list(cats.values())
+        now = timezone.now()
+
+        created_count = 0
+        attempts = 0
+        # keep trying until n unique (title, seller) combos are created (get_or_create safe)
+        while created_count < n and attempts < n * 3:
+            attempts += 1
+            cat = random.choice(all_cats)
+            title = random.choice(titles_by_cat[cat.name])
+            seller = random.choice(sellers)
+
+            defaults = dict(
+                seller=seller,
+                category=cat,
+                description="Great condition, works perfectly. See photos.",
+                condition=random.choice(conditions),
+                brand=random.choice(brands),
+                model=f"Model-{random.randint(100,999)}",
+                price=Decimal(str(round(random.uniform(10, 1200), 2))),
+                original_price=Decimal(str(round(random.uniform(10, 1500), 2))),
+                is_negotiable=True,
+                location=f"{random.randint(1, 200)} Main St",
+                city=seller.city or "Berlin",
+                country=seller.country or "Germany",
+                # lat/long optional; omit to keep simple & valid
+                shipping_options=random.choice(shipping_pool),
+                shipping_cost=Decimal(str(round(random.uniform(0, 30), 2))),
+                # status will be set to active once verified below
+            )
+
             product, created = Product.objects.get_or_create(
-                title=product_data['title'],
-                seller=product_data['seller'],
-                defaults=product_data
+                title=title, seller=seller, defaults=defaults
             )
-            if created:
-                self.stdout.write(f'Created product: {product.title}')
-                # Add images
-                for idx, img_path in enumerate(images):
-                    # Create ProductImage with local file
-                    product_image = ProductImage.objects.create(
-                        product=product,
-                        is_main=(idx == 0)
-                    )
-                    
-                    # Set the image field to the local file path
-                    from django.core.files import File
-                    import os
-                    from django.conf import settings
-                    
-                    full_path = os.path.join(settings.MEDIA_ROOT, img_path)
-                    if os.path.exists(full_path):
-                        with open(full_path, 'rb') as f:
-                            product_image.image.save(
-                                os.path.basename(img_path),
-                                File(f),
-                                save=True
-                            ) 
+            if not created:
+                continue
+
+            # verify & activate using your model method (sets fields and saves)
+            product.verify_product(admin_user=admin, notes="Auto-verified by seed command.")
+
+            # attach 1–3 images via external URLs; first one as main
+            for idx, url in enumerate(_rand_image_urls(random.randint(1, 3))):
+                ProductImage.objects.create(product=product, image_url=url, is_main=(idx == 0))
+
+            created_count += 1
+            self.stdout.write(f"Created product: {product.title} ({product.category.name})")
+
+        if created_count < n:
+            self.stdout.write(self.style.WARNING(f"Created {created_count}/{n} (unique title/seller combos exhausted)."))
